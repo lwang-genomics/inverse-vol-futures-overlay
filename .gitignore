@@ -1,0 +1,17 @@
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Market data: downloaded on first run; Yahoo's terms do not allow redistribution
+data/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
