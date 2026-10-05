@@ -123,6 +123,14 @@ The tests check the engine against independent calculations:
 - The sample covers only the final leg of the 2000–02 dot-com crash.
 - There are no taxes. Results are in USD; a EUR-based investor would face additional currency effects.
 
+## Follow-up
+
+Part III of [trend-following-replication](https://github.com/lwang-genomics/trend-following-replication) rebuilds
+the inverse-vol Treasury book with the same rules on back-adjusted futures (roll yield included, 1991–2024). It adds
+a trend-following overlay, following Dao et al. (2016) on trend convexity. At equal 10% volatility the overlay raises
+the Sharpe ratio from 0.66 to 0.99 and reduces the maximum drawdown from −28% to −21%. Its protection covers bear
+markets that unfold over months, such as 2022, rather than crashes lasting a few weeks.
+
 ## Context
 
 This started as a practical question: how to run a long-only multi-asset portfolio and scale it to a target
