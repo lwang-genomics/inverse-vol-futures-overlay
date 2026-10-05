@@ -12,7 +12,7 @@ The emphasis is on **what survives robustness testing**: realistic implementatio
 sub-periods, block-bootstrap confidence intervals and asset-dependence checks. Several "obvious" conclusions
 did not survive them.
 
-📄 **Full report (22 pages):** [`report/inverse_vol_futures_overlay.pdf`](report/inverse_vol_futures_overlay.pdf)
+📄 **Full report (PDF):** [`report/inverse_vol_futures_overlay.pdf`](report/inverse_vol_futures_overlay.pdf)
 
 ---
 
@@ -117,8 +117,8 @@ The tests check the engine against independent calculations:
 
 ## Limitations
 
-- Yahoo continuous futures are not back-adjusted, and futures roll costs are not modelled. DX is the spot
-  index, with no carry.
+- Yahoo continuous futures are not back-adjusted, and futures roll costs are not modelled (the follow-up below
+  rebuilds the Treasury book on back-adjusted futures). DX is the spot index, with no carry.
 - The volatility-targeted books assume frictionless leverage up to 3×. Margin, financing basis and liquidity are
   ignored.
 - The sample covers only the final leg of the 2000–02 dot-com crash.
