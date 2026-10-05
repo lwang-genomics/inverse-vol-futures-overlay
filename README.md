@@ -12,7 +12,7 @@ The emphasis is on **what survives robustness testing**: realistic implementatio
 sub-periods, block-bootstrap confidence intervals and asset-dependence checks. Several "obvious" conclusions
 did not survive them.
 
-📄 **Full report (33 pages):** [`report/inverse_vol_futures_overlay.pdf`](report/inverse_vol_futures_overlay.pdf)
+📄 **Full report (22 pages):** [`report/inverse_vol_futures_overlay.pdf`](report/inverse_vol_futures_overlay.pdf)
 
 ---
 
@@ -127,5 +127,5 @@ This started as a practical question: how to run a long-only multi-asset portfol
 volatility with a futures overlay, and which parts of the usual backtest story actually hold up. It is research
 code, **not investment advice**.
 
-**Author:** Liangxi Wang, computational biologist (statistical modelling of high-dimensional genomics data)
-working on quantitative finance research. Licence: MIT.
+**Author:** Liangxi Wang, computational scientist (Genomics PhD). Independent project, not affiliated with any
+employer. Licence: MIT.
