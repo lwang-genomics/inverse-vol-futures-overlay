@@ -127,5 +127,8 @@ This started as a practical question: how to run a long-only multi-asset portfol
 volatility with a futures overlay, and which parts of the usual backtest story actually hold up. It is research
 code, **not investment advice**.
 
+Implemented with AI-assisted coding (Claude Code). Research questions, design decisions, robustness checks
+and interpretation are my own; all results are reproducible from the code.
+
 **Author:** Liangxi Wang, computational scientist (Genomics PhD). Independent project, not affiliated with any
 employer. Licence: MIT.
