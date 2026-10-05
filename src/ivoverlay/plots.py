@@ -201,18 +201,21 @@ def compare_fut_etf(fut: pd.Series, etf: pd.Series, name: str) -> None:
 
 
 def growth_unlevered_vs_target(unlevered: dict[str, pd.Series], targeted: dict[str, pd.Series], name: str) -> None:
-    """Stacked panels sharing the time axis: a, unlevered books; b, books scaled to the vol target."""
-    fig, axes = plt.subplots(2, 1, sharex=True)
-    for ax, letter, panel, ylabel in zip(axes, "ab", (unlevered, targeted),
-                                         ("Cum. log return\n(unlevered)", "Cum. log return\n(10% vol target)")):
+    """Side-by-side panels on a shared y-axis: a, unlevered books; b, books scaled to the vol target."""
+    fig, axes = plt.subplots(1, 2, sharey=True)
+    for ax, letter, panel, title in zip(axes, "ab", (unlevered, targeted), ("Unlevered", "10% volatility target")):
         for k, lr in panel.items():
             cum = lr.cumsum()
             ax.plot(cum.index, cum, color=LABEL_COLORS[k], linestyle=LABEL_LSTYLES.get(k, "solid"),
                     linewidth=LABEL_LW.get(k, DALE_LINE_WIDTH), label=k, zorder=1 if k == "ES only" else 2)
-        ax.set_ylabel(ylabel)
+        style_dates(ax, cum.index)
+        ax.xaxis.set_major_locator(YearLocator(base=5))
+        ax.text(0.0, 1.02, title, transform=ax.transAxes, fontsize=DALE_FONT_ANNOT, va="bottom")
         panel_label(ax, letter)
-    style_dates(axes[-1], cum.index)
+    axes[0].set_ylabel("Cumulative log return")
+    axes[1].tick_params(axis="y", labelleft=False)
     fig_legend(fig, axes[0], ncol=4)
+    fig.subplots_adjust(wspace=0.08)
     finish(fig, name)
 
 
