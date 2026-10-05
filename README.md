@@ -29,7 +29,7 @@ did not survive them.
 | S&P 500 beats a world-equity sleeve | **Only in 2012–2026** | Significant in that era (t ≈ 2.6), but on 2000–2026 the difference is insignificant, and inside the inverse-vol book the two give the same Sharpe (0.87 vs 0.86). |
 
 <p align="center">
-  <img src="figures/fig14_trad_growth.png" width="85%"><br>
+  <img src="figures/fig14_trad_growth.png" width="90%"><br>
   <em>a, unlevered books. b, the same books scaled ex ante to a 10% volatility target (futures overlay, leverage ≤ 3×).</em>
 </p>
 
@@ -50,10 +50,12 @@ did not survive them.
   <em>Rolling 3-year Sharpe ratio: leadership changes hands several times.</em>
 </p>
 
-| Sharpe difference (moving-block bootstrap, 63-day blocks, 2,000 resamples) | Estimate | 95% interval | Resamples > 0 |
-|---|---:|---:|---:|
-| Inv-vol USD − Inv-vol Trad | 0.20 | [−0.23, 0.57] | 80% |
-| Inv-vol USD − Fixed 60/30/10 | 0.28 | [−0.07, 0.63] | 94% |
+Sharpe differences, moving-block bootstrap (63-day blocks, 2,000 resamples):
+
+| Comparison | Δ Sharpe | 95% interval | Share > 0 |
+|---|---:|:---:|---:|
+| Inv-vol USD vs Inv-vol Trad | 0.20 | −0.23 to 0.57 | 80% |
+| Inv-vol USD vs Fixed 60/30/10 | 0.28 | −0.07 to 0.63 | 94% |
 
 | Sharpe by sub-period | Inv-vol USD | Inv-vol Trad | Fixed 60/30/10 |
 |---|---:|---:|---:|

@@ -201,19 +201,18 @@ def compare_fut_etf(fut: pd.Series, etf: pd.Series, name: str) -> None:
 
 
 def growth_unlevered_vs_target(unlevered: dict[str, pd.Series], targeted: dict[str, pd.Series], name: str) -> None:
-    fig, axes = plt.subplots(1, 2)
+    """Stacked panels sharing the time axis: a, unlevered books; b, books scaled to the vol target."""
+    fig, axes = plt.subplots(2, 1, sharex=True)
     for ax, letter, panel, ylabel in zip(axes, "ab", (unlevered, targeted),
-                                         ("Cumulative log return", "Cum. log return, 10% vol target")):
+                                         ("Cum. log return\n(unlevered)", "Cum. log return\n(10% vol target)")):
         for k, lr in panel.items():
             cum = lr.cumsum()
             ax.plot(cum.index, cum, color=LABEL_COLORS[k], linestyle=LABEL_LSTYLES.get(k, "solid"),
                     linewidth=LABEL_LW.get(k, DALE_LINE_WIDTH), label=k, zorder=1 if k == "ES only" else 2)
         ax.set_ylabel(ylabel)
-        style_dates(ax, cum.index)
-        ax.xaxis.set_major_locator(YearLocator(base=5))
         panel_label(ax, letter)
+    style_dates(axes[-1], cum.index)
     fig_legend(fig, axes[0], ncol=4)
-    fig.subplots_adjust(wspace=0.35)
     finish(fig, name)
 
 
