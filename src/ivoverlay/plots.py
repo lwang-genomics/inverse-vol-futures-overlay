@@ -13,6 +13,7 @@ from .metrics import drawdown
 
 PORT_COLORS = dict(zip(PORTS, list(DALE_METHOD_COLORS.values())[:3]))
 PORT_LSTYLES = dict(zip(PORTS, list(DALE_METHOD_LSTYLES.values())[:3]))
+OVERLAP_ALPHA = 0.7  # lines that cross or coincide stay visible through each other
 PORT_LW = {"iv_usd": DALE_LINE_EMPH, "iv_trad": DALE_LINE_WIDTH, "fixed_trad": DALE_LINE_WIDTH}
 
 # Okabe-Ito: blue equity, green dollar, orange gold, mauve Treasury
@@ -96,7 +97,7 @@ def assets_cum(lr: pd.DataFrame, name: str) -> None:
     fig, ax = plt.subplots()
     cum = lr.cumsum()
     for c in cum.columns:
-        ax.plot(cum.index, cum[c], color=ASSET_COLORS[c], linewidth=DALE_LINE_WIDTH, label=c)
+        ax.plot(cum.index, cum[c], color=ASSET_COLORS[c], linewidth=DALE_LINE_WIDTH, alpha=OVERLAP_ALPHA, label=c)
     ax.axhline(0.0, color=DALE_NONSIG, linewidth=0.8)
     ax.set_ylabel("Cumulative log return")
     legend_top(ax, ncol=len(cum.columns))
@@ -119,7 +120,8 @@ def drawdowns(series: dict[str, pd.Series], name: str, colors: dict, lstyles: di
     for k, lr in series.items():
         dd = drawdown(lr)
         ax.plot(dd.index, dd, color=colors[k], linewidth=DALE_LINE_WIDTH,
-                linestyle=(lstyles or {}).get(k, "solid"), label=k)
+                linestyle=(lstyles or {}).get(k, "solid"), alpha=OVERLAP_ALPHA if len(series) > 1 else 1.0,
+                label=k)
         if len(series) == 1:
             ax.fill_between(dd.index, dd, 0.0, color=colors[k], alpha=0.3, linewidth=0)
     ax.yaxis.set_major_formatter(PercentFormatter(1.0))
@@ -166,7 +168,8 @@ def rolling_corr(panels: dict[str, tuple[str, dict[str, pd.Series]]], name: str)
     fig, axes = plt.subplots(len(panels), 1, sharex=True)
     for ax, (letter, (title, pairs)) in zip(axes, panels.items()):
         for (label, rc), (color, ls) in zip(pairs.items(), pair_style):
-            ax.plot(rc.index, rc, color=color, linestyle=ls, linewidth=DALE_LINE_WIDTH, label=label)
+            ax.plot(rc.index, rc, color=color, linestyle=ls, linewidth=DALE_LINE_WIDTH, alpha=OVERLAP_ALPHA,
+                    label=label)
         ax.axhline(0.0, color=DALE_NONSIG, linewidth=0.8)
         ax.set_ylim(-1, 1)
         ax.set_ylabel("Correlation")
@@ -197,7 +200,8 @@ def compare_fut_etf(fut: pd.Series, etf: pd.Series, name: str) -> None:
     for lr, color, ls, label in [(fut, PORT_COLORS["iv_usd"], "solid", "Futures ES/DX/GC"),
                                  (etf, PORT_COLORS["iv_trad"], "dashed", "ETF SPY/UUP/GLD")]:
         cum = scaled_cum(lr)
-        ax.plot(cum.index, cum, color=color, linestyle=ls, linewidth=DALE_LINE_EMPH, label=label)
+        ax.plot(cum.index, cum, color=color, linestyle=ls, linewidth=DALE_LINE_EMPH, alpha=OVERLAP_ALPHA,
+                label=label)
     ax.set_ylabel("Scaled cumulative log return")
     legend_top(ax, ncol=2)
     style_dates(ax, fut.index)
@@ -211,7 +215,8 @@ def growth_unlevered_vs_target(unlevered: dict[str, pd.Series], targeted: dict[s
         for k, lr in panel.items():
             cum = lr.cumsum()
             ax.plot(cum.index, cum, color=LABEL_COLORS[k], linestyle=LABEL_LSTYLES.get(k, "solid"),
-                    linewidth=LABEL_LW.get(k, DALE_LINE_WIDTH), label=k, zorder=1 if k == "ES only" else 2)
+                    linewidth=LABEL_LW.get(k, DALE_LINE_WIDTH), alpha=OVERLAP_ALPHA, label=k,
+                    zorder=1 if k == "ES only" else 2)
         style_dates(ax, cum.index)
         ax.xaxis.set_major_locator(YearLocator(base=5))
         ax.text(0.0, 1.02, title, transform=ax.transAxes, fontsize=DALE_FONT_ANNOT, va="bottom")
@@ -244,7 +249,7 @@ def rolling_sharpes(roll: dict[str, pd.Series], name: str) -> None:
     fig, ax = plt.subplots()
     for k, s in roll.items():
         ax.plot(s.index, s, color=PORT_COLORS[k], linestyle=PORT_LSTYLES[k], linewidth=PORT_LW[k],
-                label=PORT_LABELS[k])
+                alpha=OVERLAP_ALPHA, label=PORT_LABELS[k])
     ax.axhline(0.0, color="black", linewidth=0.8)
     ax.set_ylabel("Rolling 3-year Sharpe")
     legend_top(ax, ncol=3)
@@ -275,7 +280,7 @@ def sleeves_standalone(sl_lr: pd.DataFrame, rel: pd.Series, name: str) -> None:
     for c in ["SPY", "CSPX", "VWRD"]:
         axes[0].plot(sl_lr.index, sl_lr[c].cumsum(), color=SLEEVE_COLORS.get(c, DALE_NONSIG),
                      linestyle=SLEEVE_LSTYLES.get(c, "solid"),
-                     linewidth=DALE_LINE_EMPH if c != "SPY" else DALE_LINE_WIDTH,
+                     linewidth=DALE_LINE_EMPH if c != "SPY" else DALE_LINE_WIDTH, alpha=OVERLAP_ALPHA,
                      label=SLEEVE_LABELS.get(c, "SPY (US-listed)"), zorder=1 if c == "SPY" else 2)
     axes[0].set_ylabel("Cum. log return")
     axes[0].legend(ncol=3, loc="lower left", bbox_to_anchor=(0.0, 1.0), borderaxespad=0.2)
@@ -304,7 +309,8 @@ def world_vs_sp500(eq_lr: pd.DataFrame, rel3: pd.Series, name: str) -> None:
     fig, axes = plt.subplots(2, 1, sharex=True)
     for c, color, ls, label in (("S&P 500", SLEEVE_COLORS["CSPX"], "solid", "S&P 500 (SPY)"),
                                 ("World", SLEEVE_COLORS["VWRD"], "dashed", "World proxy (50% SPY + 50% VGTSX)")):
-        axes[0].plot(eq_lr.index, eq_lr[c].cumsum(), color=color, linestyle=ls, linewidth=DALE_LINE_EMPH, label=label)
+        axes[0].plot(eq_lr.index, eq_lr[c].cumsum(), color=color, linestyle=ls, linewidth=DALE_LINE_EMPH,
+                     alpha=OVERLAP_ALPHA, label=label)
     axes[0].set_ylabel("Cum. log return")
     axes[0].legend(ncol=2, loc="lower left", bbox_to_anchor=(0.0, 1.0), borderaxespad=0.2)
     _relative_panel(axes[1], rel3, "3y log return p.a.,\nWorld − S&P")
