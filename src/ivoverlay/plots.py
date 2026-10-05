@@ -60,10 +60,14 @@ def fig_legend(fig, ax, ncol: int) -> None:
                bbox_to_anchor=(0.5, 0.96), borderaxespad=0.2)
 
 
-def finish(fig, name: str, wide: bool = True) -> None:
+def finish(fig, name: str, wide: bool = True, size: tuple[float, float] | None = None) -> None:
+    """Save with the style file's slide sizes; `size` (in) overrides them for a specific figure."""
     FIG_DIR.mkdir(exist_ok=True)
     path = FIG_DIR / name
-    (save_slide_wide if wide else save_slide)(path, fig)
+    if size is not None:
+        save_slide_wide(path, fig, width=size[0], height=size[1])
+    else:
+        (save_slide_wide if wide else save_slide)(path, fig)
     plt.close(fig)
     print(f"Saved {path.relative_to(ROOT)}")
 
@@ -216,7 +220,7 @@ def growth_unlevered_vs_target(unlevered: dict[str, pd.Series], targeted: dict[s
     axes[1].tick_params(axis="y", labelleft=False)
     fig_legend(fig, axes[0], ncol=4)
     fig.subplots_adjust(wspace=0.08)
-    finish(fig, name)
+    finish(fig, name, size=(12.0, 4.5))
 
 
 def yearly_books(yr: pd.DataFrame, name: str) -> None:
