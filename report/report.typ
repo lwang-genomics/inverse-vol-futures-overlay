@@ -20,7 +20,10 @@
 #show figure: set block(breakable: false, above: 1.2em, below: 1.2em)
 #set figure(gap: 0.6em)
 
-#let fig(path, caption, label: none) = [#figure(image("../figures/" + path, width: 100%), caption: caption) #label]
+// Figure set used in this PDF: "report/" = figures sized for the page (default); "" = the slide versions
+// shown in the README (the previous layout of this report).
+#let figset = "report/"
+#let fig(path, caption, label: none) = [#figure(image("../figures/" + figset + path, width: 100%), caption: caption) #label]
 
 #let num(x) = {
   let neg = x < 0
@@ -48,48 +51,53 @@
 // ---------------------------------------------------------------- title
 #align(center)[
   #text(size: 20pt)[Inverse-Volatility Walk-Forward Backtest] \
-  #v(0.3em)
-  #text(size: 12pt)[Futures basket (ES / DX / GC), ETF proxies (SPY / UUP / GLD), \
-    a traditional Treasury basket, and UCITS equity sleeves] \
-  #v(0.3em)
-  #text(size: 10pt, fill: luma(110))[Liangxi Wang · data via Yahoo Finance (yfinance) through #F.end_date · October 2026 \
+  #v(0.5em)
+  #text(size: 10pt, fill: luma(110))[Liangxi Wang · data via Yahoo Finance through #F.end_date · October 2026 \
     #link("https://github.com/lwang-genomics/inverse-vol-futures-overlay")[github.com/lwang-genomics/inverse-vol-futures-overlay]]
 ]
-#v(1em)
-#outline(depth: 2, indent: auto)
+#v(0.8em)
+#block(inset: (x: 1.2em), [
+  #text(weight: "bold")[Abstract.] A walk-forward study of long-only inverse-volatility portfolios built from
+  futures (S&P 500, the US dollar or 10-year Treasuries, and gold) and from their ETF proxies, October 2001 to
+  October 2026. Weights come from the trailing year and are reset quarterly, trades pay 10 bp, and a futures
+  overlay can scale each book to 10% ex-ante volatility. The inverse-vol books lost less than a fixed 60/30/10
+  portfolio and than equities in every stress episode, and the dollar book had the highest Sharpe ratio (0.87).
+  No Sharpe difference is statistically significant, however, and much of the dollar book's lead comes from
+  2022–2026. The ETF version tracks the futures book closely, rebalancing frequency is a second-order choice, and
+  the S&P 500 sleeve's lead over an All-World sleeve belongs to the period after 2012.
+])
+#v(0.2em)
+#figure(image("../figures/" + figset + "fig14_trad_growth.png", width: 84%),
+  caption: [Inverse-vol books and a fixed 60/30/10 portfolio, unlevered (a) and scaled to 10% ex-ante volatility (b). Grey: S&P 500 futures alone.])
+#figure(image("../figures/" + figset + "fig15_trad_drawdown.png", width: 84%),
+  caption: [Drawdowns of the same unlevered books: the inverse-vol books lost less in every stress episode.])
 #pagebreak()
+#outline(depth: 2, indent: auto)
 
 // ---------------------------------------------------------------- 1
-= Abstract
+= Key results
 
-This note documents a walk-forward backtest of a long-only inverse-volatility portfolio on three futures
-sleeves (equity ES, US dollar DX, gold GC) from October 2001 through October 2026. Weights are estimated
-from the trailing year of daily returns and reset every quarter; between rebalances they drift with prices,
-and every trade pays 10 bp. The note then asks four questions. Can the rule be replicated with liquid ETFs
-(SPY, UUP, GLD)? How does it compare with a traditional basket that holds 10-year Treasuries instead of the
-dollar (ES / ZN / GC, or SPY / IEF / GLD), run both with the same inverse-vol rule and as a fixed 60/30/10
-allocation? How do the asset correlations behind each basket evolve? And, for a European implementation, which
-UCITS equity sleeve works better: an S&P 500 ETF (CSPX) or the Vanguard FTSE All-World ETF (VWRD, the same fund
-as VWCE)?
+The study runs a long-only inverse-volatility rule on three futures sleeves (equity ES, US dollar DX, gold GC)
+and asks four questions: can it be replicated with ETFs (SPY, UUP, GLD); how does it compare with a traditional
+basket holding 10-year Treasuries instead of the dollar (ES / ZN / GC), run with the same rule and as a fixed
+60/30/10 allocation; how do the correlations behind each basket evolve; and, for a European investor, which
+UCITS equity sleeve works better, an S&P 500 ETF (CSPX) or the FTSE All-World ETF (VWRD, the same fund as VWCE)?
 
-Over the full sample the inverse-vol USD book returns ≈5.0% a year at 5.7% volatility with a −11% worst
-drawdown (Sharpe 0.87). Inverse-vol on ES / ZN / GC has a Sharpe of 0.67 and a −19% drawdown. The fixed 60/30/10
-portfolio earns more in absolute terms, but at about twice the volatility, with a −34% drawdown and a Sharpe of 0.60.
-Scaled ex ante to the same 10% volatility, the inverse-vol USD book still compounds fastest (9.8% vs
-6.0–6.9% a year), but it needs about 2× leverage to get there.
-
-This ranking should be read with caution. The Sharpe differences are not statistically significant: every
-block-bootstrap 95% interval includes zero. Inverse-vol on Treasuries was ahead in 2001–2012, and much of the
-dollar book's lead comes from 2022–2026, when bonds fell together with equities. Without gold, both inverse-vol
-books have Sharpe ratios near 0.35. The robust finding is the drawdown profile: both inverse-vol books lost less
-than 60/30/10 and equities in every stress episode in the sample.
-
-The ETF version tracks the futures book closely (correlation ≈0.91); measured over T-bills, its Sharpe is
-0.84. Rebalancing frequency is a second-order choice: quarterly cuts turnover by a third relative to monthly,
-and Sharpe moves by less than 0.05. On the 2012–2026 sample, the S&P 500 sleeve beat the All-World sleeve on its
-own and inside every portfolio. A 2000–2026 test with a world-equity proxy shows that this lead belongs to one era:
-the world sleeve led in 2000–2011, and inside the inverse-vol book the two sleeves are indistinguishable over the
-full period (Sharpe 0.87 vs 0.86).
+- *Performance.* The inverse-vol USD book returns ≈5.0% a year at 5.7% volatility, with a −11% worst drawdown
+  (Sharpe 0.87). Inverse-vol on ES / ZN / GC has a Sharpe of 0.67 and a −19% drawdown. The fixed 60/30/10
+  portfolio earns more in absolute terms at about twice the volatility (Sharpe 0.60, drawdown −34%). Scaled to the
+  same 10% volatility, the USD book compounds fastest (9.8% vs 6.0–6.9% a year), with about 2× leverage.
+- *Read the ranking with caution.* Every block-bootstrap 95% interval for the Sharpe differences includes zero.
+  Inverse-vol on Treasuries was ahead in 2001–2012, much of the dollar book's lead comes from 2022–2026, when bonds
+  fell with equities, and without gold both inverse-vol books have Sharpe ratios near 0.35.
+- *The robust finding is the drawdown profile:* both inverse-vol books lost less than 60/30/10 and equities in
+  every stress episode in the sample.
+- *Implementation.* The ETF version tracks the futures book closely (correlation ≈0.91; Sharpe 0.84 over
+  T-bills). Quarterly rebalancing cuts turnover by a third relative to monthly, and Sharpe moves by less than 0.05.
+- *Equity sleeve.* On 2012–2026 the S&P 500 sleeve beat the All-World sleeve on its own and inside every
+  portfolio. A 2000–2026 test with a world-equity proxy shows the lead belongs to one era: the world sleeve led in
+  2000–2011, and inside the inverse-vol book the two are indistinguishable over the full period (Sharpe 0.87 vs
+  0.86).
 
 // ---------------------------------------------------------------- 2
 = Data and universe

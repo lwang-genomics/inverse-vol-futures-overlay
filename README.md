@@ -89,7 +89,8 @@ uv run pytest            # unit tests on synthetic data (no network)
 
 Prices are downloaded on first run and cached in `data/` (not committed; Yahoo's terms do not allow
 redistribution). Yahoo occasionally revises history, so a fresh download can move the last digits of some
-results. The committed `results/` match the committed report.
+results. The committed `results/` match the committed report. Every figure is drawn twice from the same code: slide
+versions in `figures/` (shown in this README) and report versions sized for the PDF in `figures/report/`.
 
 ## Code
 

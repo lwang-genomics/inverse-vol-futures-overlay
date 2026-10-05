@@ -2,6 +2,8 @@
 
 from .viz_style import *  # noqa: I001  (must load first: sets the theme)
 
+import functools
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -36,19 +38,58 @@ LABEL_LW = {PORT_LABELS[k]: PORT_LW[k] for k in PORTS}
 # ------------------------------------------------------------------ helpers
 
 
-def style_dates(ax, idx: pd.DatetimeIndex, rotate: bool = True) -> None:
+# Every figure is drawn twice: with the slide theme into figures/ (README) and with the report
+# theme into figures/report/ (PDF, sized to the A4 text width so that text is not shrunk).
+REPORT_WIDTH = 6.5  # inches: the text width of the PDF report
+_MODE = {"report": False}
+
+
+def is_report() -> bool:
+    return _MODE["report"]
+
+
+def fs_annot() -> float:
+    return DALE_FONT_ANNOT_REPORT if is_report() else DALE_FONT_ANNOT
+
+
+def fs_panel() -> float:
+    return 14 if is_report() else 16  # panel letters (style guide, rule 6)
+
+
+def dual(fn):
+    """Draw the figure with the slide theme, then again with the report theme."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            for report in (False, True):
+                _MODE["report"] = report
+                (set_theme_report if report else set_theme_slide)()
+                fn(*args, **kwargs)
+        finally:
+            _MODE["report"] = False
+            set_theme_slide()
+
+    return wrapper
+
+
+def weekly(s: pd.Series | pd.DataFrame, how: str = "last"):
+    """Daily series shown weekly (drawdowns at their deepest point, so that no trough is lost)."""
+    return getattr(s.resample("W-FRI"), how)().dropna(how="all")
+
+
+def style_dates(ax, idx: pd.DatetimeIndex, base: int | None = None) -> None:
     years = (idx[-1] - idx[0]).days / 365.25
-    ax.xaxis.set_major_locator(YearLocator(base=2 if years > 12 else 1))
+    base = base or 1
+    while years / base > (7 if is_report() else 12):
+        base *= 2
+    ax.xaxis.set_major_locator(YearLocator(base=base))
     ax.xaxis.set_major_formatter(DateFormatter("%Y"))
     ax.set_xlim(idx[0], idx[-1])
-    if rotate:
-        ax.tick_params(axis="x", labelrotation=45)
-        for label in ax.get_xticklabels():
-            label.set_horizontalalignment("right")
 
 
 def panel_label(ax, letter: str) -> None:
-    ax.text(-0.12, 1.12, letter, transform=ax.transAxes, fontsize=16, fontweight="bold", va="top")
+    ax.text(-0.12, 1.12, letter, transform=ax.transAxes, fontsize=fs_panel(), fontweight="bold", va="top")
 
 
 def legend_top(ax, ncol: int, **kw) -> None:
@@ -61,14 +102,20 @@ def fig_legend(fig, ax, ncol: int) -> None:
                bbox_to_anchor=(0.5, 0.96), borderaxespad=0.2)
 
 
-def finish(fig, name: str, wide: bool = True, size: tuple[float, float] | None = None) -> None:
-    """Save with the style file's slide sizes; `size` (in) overrides them for a specific figure."""
-    FIG_DIR.mkdir(exist_ok=True)
-    path = FIG_DIR / name
-    if size is not None:
-        save_slide_wide(path, fig, width=size[0], height=size[1])
+def finish(fig, name: str, wide: bool = True, size: tuple[float, float] | None = None,
+           report_size: tuple[float, float] | None = None) -> None:
+    """Save with the style file's slide sizes (`size` overrides), or in report mode at the report text width."""
+    w, h = size or ((10.0, 5.0) if wide else (6.5, 5.0))
+    if is_report():
+        out = FIG_DIR / "report"
+        out.mkdir(parents=True, exist_ok=True)
+        rw, rh = report_size or (REPORT_WIDTH, min(3.4, max(2.9, REPORT_WIDTH * h / w)))
+        path = out / name
+        save_report_double(path, fig, width=rw, height=rh)
     else:
-        (save_slide_wide if wide else save_slide)(path, fig)
+        FIG_DIR.mkdir(exist_ok=True)
+        path = FIG_DIR / name
+        save_slide_wide(path, fig, width=w, height=h)
     plt.close(fig)
     print(f"Saved {path.relative_to(ROOT)}")
 
@@ -93,6 +140,7 @@ def sleeve_bars(ax, values: dict[str, list[float]], colors: dict[str, str], labe
 # ------------------------------------------------------------------ generic figures
 
 
+@dual
 def assets_cum(lr: pd.DataFrame, name: str) -> None:
     fig, ax = plt.subplots()
     cum = lr.cumsum()
@@ -105,6 +153,7 @@ def assets_cum(lr: pd.DataFrame, name: str) -> None:
     finish(fig, name)
 
 
+@dual
 def scaled_path(lr: pd.Series, name: str, label: str) -> None:
     cum = scaled_cum(lr)
     fig, ax = plt.subplots()
@@ -115,10 +164,11 @@ def scaled_path(lr: pd.Series, name: str, label: str) -> None:
     finish(fig, name)
 
 
+@dual
 def drawdowns(series: dict[str, pd.Series], name: str, colors: dict, lstyles: dict | None = None) -> None:
     fig, ax = plt.subplots()
     for k, lr in series.items():
-        dd = drawdown(lr)
+        dd = weekly(drawdown(lr), "min")
         ax.plot(dd.index, dd, color=colors[k], linewidth=DALE_LINE_WIDTH,
                 linestyle=(lstyles or {}).get(k, "solid"), alpha=OVERLAP_ALPHA if len(series) > 1 else 1.0,
                 label=k)
@@ -131,6 +181,7 @@ def drawdowns(series: dict[str, pd.Series], name: str, colors: dict, lstyles: di
     finish(fig, name)
 
 
+@dual
 def weights(held: dict[str, pd.DataFrame], name: str) -> None:
     fig, axes = plt.subplots(len(held), 1, sharex=True)
     axes = np.atleast_1d(axes)
@@ -139,53 +190,66 @@ def weights(held: dict[str, pd.DataFrame], name: str) -> None:
                      labels=h.columns, alpha=0.85, linewidth=0)
         ax.set_ylim(0, 1)
         ax.set_ylabel("Weight")
-        ax.legend(ncol=3, loc="lower left", bbox_to_anchor=(0.30, 1.0), borderaxespad=0.2)
-        ax.text(0.0, 1.04, title, transform=ax.transAxes, fontsize=DALE_FONT_ANNOT, va="bottom")
+        ax.legend(ncol=3, loc="lower right", bbox_to_anchor=(1.0, 1.0), borderaxespad=0.2)  # clear of the title
+        ax.text(0.0, 1.04, title, transform=ax.transAxes, fontsize=fs_annot(), va="bottom")
         if len(held) > 1:
             panel_label(ax, letter)
     style_dates(axes[-1], next(iter(held.values())).index)
-    finish(fig, name)
+    finish(fig, name, report_size=(REPORT_WIDTH, 4.2) if len(held) > 1 else None)
 
 
+def year_ticks(ax, years) -> None:
+    """Horizontal year labels on a bar chart, every 2 (slides) or 4 (report) years."""
+    step = 4 if is_report() else 2
+    x = [i for i, y in enumerate(years) if int(y) % step == 0]
+    ax.set_xticks(x, [str(years[i]) for i in x])
+    ax.set_xlim(-0.6, len(years) - 0.4)
+
+
+@dual
 def yearly(lr: pd.Series, name: str) -> None:
     yr = np.exp(lr.groupby(lr.index.year).sum()) - 1.0
     fig, ax = plt.subplots()
     colors = [DALE_2GROUP_LIST[0] if v >= 0 else DALE_2GROUP_LIST[1] for v in yr]
-    ax.bar(yr.index.astype(str), yr.values, color=colors, width=DALE_BAR_WIDTH)
+    ax.bar(np.arange(len(yr)), yr.values, color=colors, width=DALE_BAR_WIDTH)
     ax.axhline(0.0, color="black", linewidth=0.8)
     ax.set_ylabel("Calendar-year return")
     ax.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=0))
-    ax.tick_params(axis="x", labelrotation=90)
+    year_ticks(ax, list(yr.index))
     finish(fig, name)
 
 
 # ------------------------------------------------------------------ section-specific figures
 
 
+@dual
 def rolling_corr(panels: dict[str, tuple[str, dict[str, pd.Series]]], name: str) -> None:
     """panels: letter -> (title, {pair label: rolling correlation}); same pair role -> same style."""
     pair_style = [(DALE_REGLINE, "solid"), (GOLD_C, "dashed"), (DALE_SIG, "dotted")]
     fig, axes = plt.subplots(len(panels), 1, sharex=True)
     for ax, (letter, (title, pairs)) in zip(axes, panels.items()):
         for (label, rc), (color, ls) in zip(pairs.items(), pair_style):
+            rc = weekly(rc)
             ax.plot(rc.index, rc, color=color, linestyle=ls, linewidth=DALE_LINE_WIDTH, alpha=OVERLAP_ALPHA,
                     label=label)
         ax.axhline(0.0, color=DALE_NONSIG, linewidth=0.8)
         ax.set_ylim(-1, 1)
         ax.set_ylabel("Correlation")
-        ax.legend(ncol=3, loc="lower left", bbox_to_anchor=(0.42, 1.0), borderaxespad=0.2)
-        ax.text(0.0, 1.04, title, transform=ax.transAxes, fontsize=DALE_FONT_ANNOT, va="bottom")
+        ax.legend(ncol=3, loc="lower right", bbox_to_anchor=(1.0, 1.0), borderaxespad=0.2)  # clear of the title
+        short = title.split(" (")[0]  # the legend already names the assets of each pair
+        ax.text(0.0, 1.04, short, transform=ax.transAxes, fontsize=fs_annot(), va="bottom")
         panel_label(ax, letter)
     first = next(iter(next(iter(panels.values()))[1].values())).dropna()
     style_dates(axes[-1], first.index)
-    finish(fig, name)
+    finish(fig, name, report_size=(REPORT_WIDTH, 4.2))
 
 
+@dual
 def corr_regimes(regime: pd.DataFrame, name: str) -> None:
     fig, ax = plt.subplots()
     im = ax.imshow(regime.values, cmap=dale_div_cmap(), vmin=-0.6, vmax=0.6, aspect="auto")
     for (r, c), v in np.ndenumerate(regime.values):
-        ax.text(c, r, f"{v:+.2f}".replace("-", "−"), ha="center", va="center", fontsize=DALE_FONT_ANNOT)
+        ax.text(c, r, f"{v:+.2f}".replace("-", "−"), ha="center", va="center", fontsize=fs_annot())
     ax.set_xticks(range(regime.shape[1]), regime.columns)
     ax.set_yticks(range(regime.shape[0]), regime.index)
     ax.tick_params(length=0)
@@ -195,6 +259,7 @@ def corr_regimes(regime: pd.DataFrame, name: str) -> None:
     finish(fig, name)
 
 
+@dual
 def compare_fut_etf(fut: pd.Series, etf: pd.Series, name: str) -> None:
     fig, ax = plt.subplots()
     for lr, color, ls, label in [(fut, PORT_COLORS["iv_usd"], "solid", "Futures ES/DX/GC"),
@@ -208,6 +273,7 @@ def compare_fut_etf(fut: pd.Series, etf: pd.Series, name: str) -> None:
     finish(fig, name)
 
 
+@dual
 def growth_unlevered_vs_target(unlevered: dict[str, pd.Series], targeted: dict[str, pd.Series], name: str) -> None:
     """Side-by-side panels on a shared y-axis: a, unlevered books; b, books scaled to the vol target."""
     fig, axes = plt.subplots(1, 2, sharey=True)
@@ -217,9 +283,8 @@ def growth_unlevered_vs_target(unlevered: dict[str, pd.Series], targeted: dict[s
             ax.plot(cum.index, cum, color=LABEL_COLORS[k], linestyle=LABEL_LSTYLES.get(k, "solid"),
                     linewidth=LABEL_LW.get(k, DALE_LINE_WIDTH), alpha=OVERLAP_ALPHA, label=k,
                     zorder=1 if k == "ES only" else 2)
-        style_dates(ax, cum.index)
-        ax.xaxis.set_major_locator(YearLocator(base=5))
-        ax.text(0.0, 1.02, title, transform=ax.transAxes, fontsize=DALE_FONT_ANNOT, va="bottom")
+        style_dates(ax, cum.index, base=5)
+        ax.text(0.0, 1.02, title, transform=ax.transAxes, fontsize=fs_annot(), va="bottom")
         panel_label(ax, letter)
     axes[0].set_ylabel("Cumulative log return")
     axes[1].tick_params(axis="y", labelleft=False)
@@ -228,6 +293,7 @@ def growth_unlevered_vs_target(unlevered: dict[str, pd.Series], targeted: dict[s
     finish(fig, name, size=(12.0, 4.5))
 
 
+@dual
 def yearly_books(yr: pd.DataFrame, name: str) -> None:
     fig, ax = plt.subplots()
     x = np.arange(len(yr))
@@ -236,18 +302,19 @@ def yearly_books(yr: pd.DataFrame, name: str) -> None:
         ax.bar(x + (j - 1) * bw, yr[PORT_LABELS[k]], width=bw, color=PORT_COLORS[k], label=PORT_LABELS[k])
     ax.scatter(x, yr["ES only"], marker="_", s=120, color="black", linewidths=1.6, label="ES only", zorder=3)
     ax.axhline(0.0, color="black", linewidth=0.8)
-    ax.set_xticks(x, yr.index.astype(str), rotation=90)
-    ax.set_xlim(-0.6, len(x) - 0.4)
+    year_ticks(ax, list(yr.index))
     ax.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=0))
     ax.set_ylabel("Calendar-year return")
     legend_top(ax, ncol=4)
     finish(fig, name)
 
 
+@dual
 def rolling_sharpes(roll: dict[str, pd.Series], name: str) -> None:
     """roll: book key -> rolling Sharpe series."""
     fig, ax = plt.subplots()
     for k, s in roll.items():
+        s = weekly(s)
         ax.plot(s.index, s, color=PORT_COLORS[k], linestyle=PORT_LSTYLES[k], linewidth=PORT_LW[k],
                 alpha=OVERLAP_ALPHA, label=PORT_LABELS[k])
     ax.axhline(0.0, color="black", linewidth=0.8)
@@ -257,6 +324,7 @@ def rolling_sharpes(roll: dict[str, pd.Series], name: str) -> None:
     finish(fig, name)
 
 
+@dual
 def rebalance_frequency(sharpe: dict[str, list[float]], turnover: dict[str, list[float]], name: str) -> None:
     """sharpe/turnover: book key -> values for M, Q, 6M, A."""
     fig, axes = plt.subplots(1, 2)
@@ -275,6 +343,7 @@ def rebalance_frequency(sharpe: dict[str, list[float]], turnover: dict[str, list
     finish(fig, name)
 
 
+@dual
 def sleeves_standalone(sl_lr: pd.DataFrame, rel: pd.Series, name: str) -> None:
     fig, axes = plt.subplots(2, 1, sharex=True)
     for c in ["SPY", "CSPX", "VWRD"]:
@@ -288,9 +357,10 @@ def sleeves_standalone(sl_lr: pd.DataFrame, rel: pd.Series, name: str) -> None:
     panel_label(axes[0], "a")
     panel_label(axes[1], "b")
     style_dates(axes[1], sl_lr.index)
-    finish(fig, name)
+    finish(fig, name, report_size=(REPORT_WIDTH, 4.2))
 
 
+@dual
 def sleeves_in_books(sharpe: dict[str, list[float]], max_dd: dict[str, list[float]], name: str) -> None:
     """sharpe/max_dd: sleeve ('CSPX'/'VWRD') -> values per book."""
     fig, axes = plt.subplots(1, 2)
@@ -305,6 +375,7 @@ def sleeves_in_books(sharpe: dict[str, list[float]], max_dd: dict[str, list[floa
     finish(fig, name)
 
 
+@dual
 def world_vs_sp500(eq_lr: pd.DataFrame, rel3: pd.Series, name: str) -> None:
     fig, axes = plt.subplots(2, 1, sharex=True)
     for c, color, ls, label in (("S&P 500", SLEEVE_COLORS["CSPX"], "solid", "S&P 500 (SPY)"),
@@ -317,9 +388,10 @@ def world_vs_sp500(eq_lr: pd.DataFrame, rel3: pd.Series, name: str) -> None:
     panel_label(axes[0], "a")
     panel_label(axes[1], "b")
     style_dates(axes[1], eq_lr.index)
-    finish(fig, name)
+    finish(fig, name, report_size=(REPORT_WIDTH, 4.2))
 
 
+@dual
 def world_sleeve_in_books(sharpe_by_era: dict[str, dict[str, list[float]]], name: str) -> None:
     """sharpe_by_era: era -> sleeve ('S&P 500'/'World') -> Sharpe per book."""
     colors = {"S&P 500": SLEEVE_COLORS["CSPX"], "World": SLEEVE_COLORS["VWRD"]}
@@ -327,7 +399,7 @@ def world_sleeve_in_books(sharpe_by_era: dict[str, dict[str, list[float]]], name
     fig, axes = plt.subplots(1, 2, sharey=True)
     for ax, (era, values), letter in zip(axes, sharpe_by_era.items(), "ab"):
         sleeve_bars(ax, values, colors, labels, hatched="World")
-        ax.text(0.0, 1.02, era, transform=ax.transAxes, fontsize=DALE_FONT_ANNOT, va="bottom")
+        ax.text(0.0, 1.02, era, transform=ax.transAxes, fontsize=fs_annot(), va="bottom")
         panel_label(ax, letter)
     axes[0].set_ylabel("Sharpe")
     fig_legend(fig, axes[0], ncol=2)
@@ -336,6 +408,7 @@ def world_sleeve_in_books(sharpe_by_era: dict[str, dict[str, list[float]]], name
 
 
 def _relative_panel(ax, rel: pd.Series, ylabel: str) -> None:
+    rel = weekly(rel)
     ax.plot(rel.index, rel, color=DALE_REGLINE, linewidth=DALE_LINE_WIDTH)
     ax.fill_between(rel.index, rel, 0.0, color=DALE_REGLINE, alpha=0.2, linewidth=0)
     ax.axhline(0.0, color="black", linewidth=0.8)
