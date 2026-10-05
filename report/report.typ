@@ -320,7 +320,7 @@ Mean target weights: SPY #F.etf_mean_w.iv_usd.SPY / UUP #F.etf_mean_w.iv_usd.UUP
 
 #fig("fig13_compare_fut_etf.png")[Futures vs ETF Inv-vol USD cumulative log returns on the common window (each scaled to a 10% average annual endpoint).]
 
-Overlap portfolio correlation ≈ #F.overlap_corr; annualized tracking error ≈ #pct(F.overlap_te).
+Overlap portfolio correlation ≈ #F.overlap_corr, annualized tracking error ≈ #pct(F.overlap_te).
 
 == Metrics including ETF and overlap
 
