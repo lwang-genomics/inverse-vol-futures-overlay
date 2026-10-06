@@ -103,6 +103,16 @@ class Study:
             rows.append([LAB[k], fmt(a["avg_annual_return"], "pct"), fmt(b["avg_annual_return"], "pct"),
                          fmt(a["avg_annual_vol"], "pct"), fmt(b["avg_annual_vol"], "pct"),
                          fmt(a["sharpe"], "num"), fmt(b["sharpe"], "num")])
+        # The roll gap is the carry an unadjusted series leaves out: attribute each book's change to the
+        # legs' return gaps, weighted by the book's average held weights
+        gap = {c: out[c]["ret_adj"] - out[c]["ret_yahoo"] for c in legs}
+        for k in ("iv_usd", "iv_trad"):
+            w = books_adj[k].held.mean()
+            out[k] |= {"weights": w.round(3).to_dict(),
+                       "ret_gap": float(np.expm1(books_adj[k].ret.mean() * TRADING_DAYS)
+                                        - np.expm1(books_raw[k].ret.mean() * TRADING_DAYS)),
+                       "ret_gap_from_legs": float(sum(w[c] * gap[c] for c in w.index))}
+        out["tbill"] = float(np.expm1(self.rf.reindex(idx).ffill().mean() * TRADING_DAYS))
         self.facts["data_check"] = out | {"period": span(raw)}
         self.tables["data_check"] = {
             "header": ["Series", "Return, Yahoo", "Return, adjusted", "Vol, Yahoo", "Vol, adjusted",

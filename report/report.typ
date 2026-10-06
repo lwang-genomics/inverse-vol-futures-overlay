@@ -94,8 +94,9 @@ UCITS equity sleeve works better, an S&P 500 ETF (CSPX) or the FTSE All-World ET
 - *The ranking depends on the period.* Treasuries led in 2001–2012 (Sharpe 1.04 vs 0.35), the dollar in
   2022–2026 (1.09 vs 0.27), when bonds fell with equities. Every block-bootstrap 95% interval for the Sharpe
   differences includes zero.
-- *Data matter.* On Yahoo's unadjusted front-month futures the dollar book looked best (0.87 vs 0.63). Roll gaps
-  overstate gold by about 2% a year and erase most of the Treasury future's return (@sec-datacheck).
+- *Data matter.* On Yahoo's unadjusted front-month futures the dollar book looked best (0.87 vs 0.63). Unadjusted
+  series miss each future's carry: they overstate gold by about 2% a year and erase most of the Treasury future's
+  return (@sec-datacheck).
 - *Implementation.* The ETF version tracks the futures book closely (weekly correlation 0.90; Sharpe 0.84 over
   T-bills). Quarterly rebalancing cuts turnover by a third relative to monthly, and Sharpe moves by at most 0.04.
 - *Equity sleeve.* On 2012–2026 the S&P 500 sleeve beat the All-World sleeve on its own and inside every
@@ -134,15 +135,55 @@ are daily adjusted closes from Yahoo Finance from 2000-01-01.
 
 == Unadjusted vs back-adjusted futures <sec-datacheck>
 
+#let DC = F.data_check
+#let gap(c) = DC.at(c).ret_adj - DC.at(c).ret_yahoo
+#let sp(x) = {
+  let v = str(calc.round(calc.abs(x) * 100, digits: 1))
+  (if x < 0 { "−" } else { "+" }) + (if v.contains(".") { v } else { v + ".0" }) + "%"
+}
+#let wp(book, c) = str(int(calc.round(DC.at(book).weights.at(c) * 100))) + "%"
+
 Free continuous futures, such as Yahoo's, splice the front contract to the next at each expiry without
 adjustment, so every roll's price gap is counted as a return. @tbl-datacheck compares them with the back-adjusted
-series over #F.data_check.period. Volatilities are the same, but returns are not. Gold futures trade in contango
-at roughly the cash rate, so the unadjusted series behaves like spot gold and overstates the futures' excess
-return by about 2% a year. Treasury futures trade below the next contract, so each quarterly roll shows up as a
-loss that erases most of their return. The dollar index future's interest-rate carry is also missing from a spot
-index. The book ranking reverses as a result.
+series over #DC.period. Volatilities are the same, but returns are not, and the ranking of the two books
+reverses. The difference is not noise: it is the carry of each leg.
 
-#mtable(T.data_check, [Yahoo's unadjusted front-month futures vs back-adjusted futures, #F.data_check.period (before the ETF splice). Unlevered books, same rules. Futures returns are excess of cash.], size: 8.5pt) <tbl-datacheck>
+#mtable(T.data_check, [Yahoo's unadjusted front-month futures vs back-adjusted futures, #DC.period (before the ETF splice). Unlevered books, same rules. Futures returns are excess of cash.], size: 8.5pt) <tbl-datacheck>
+
+*Why the gap is the carry.* A future trades away from spot by its cost of carry and converges to spot as it
+approaches expiry; the holder earns that convergence. Rolling into the next contract restores the gap, and an
+unadjusted series books the jump as a return, which cancels the convergence. The unadjusted series therefore
+tracks the spot price, while the back-adjusted series gives the futures' excess return:
+$ r_"adjusted" - r_"unadjusted" approx "carry" = y - r_f, $
+where $y$ is what the asset yields (coupon, dividend, foreign interest rate or gold lease rate) and $r_f$ is the
+financing rate. Its sign differs across the four legs (annual return gaps, adjusted minus Yahoo):
+
+- *Gold (GC), #sp(gap("GC")).* Gold yields almost nothing, so its carry is about minus the financing rate. The gap
+  is a little larger than the average T-bill rate (#pct(DC.tbill)), because gold forwards are priced off bank
+  funding rates, which sit above T-bills. Yahoo overstates gold.
+- *10-year Treasury (ZN), #sp(gap("ZN")).* The bond's yield exceeds the short-term financing rate and it rolls
+  down an upward-sloping curve, so carry is positive and the next contract trades lower. Each quarterly roll shows
+  up as a loss, and Yahoo's series earns almost nothing.
+- *Dollar index (DX), #sp(gap("DX")).* Carry is the US interest rate minus the rates of the currency
+  basket (57% euro). Its sign changed several times over the sample, so the net gap is small.
+- *S&P 500 (ES), #sp(gap("ES")).* Dividends roughly offset the financing rate.
+
+*Why the books move in opposite directions.* Both books hold ES and GC; they differ in the defensive asset, to
+which inverse-vol weighting gives about half the book. Weighting each leg's gap by the book's average weights
+predicts the change in the book's return:
+
+- *Dollar book* (DX #wp("iv_usd", "DX"), GC #wp("iv_usd", "GC"), ES #wp("iv_usd", "ES")): predicted
+  #sp(DC.iv_usd.ret_gap_from_legs) a year, observed #sp(DC.iv_usd.ret_gap). Sharpe
+  #num(DC.iv_usd.sr_yahoo) → #num(DC.iv_usd.sr_adj).
+- *Treasury book* (ZN #wp("iv_trad", "ZN"), GC #wp("iv_trad", "GC"), ES #wp("iv_trad", "ES")): predicted
+  #sp(DC.iv_trad.ret_gap_from_legs) a year, observed #sp(DC.iv_trad.ret_gap). Sharpe
+  #num(DC.iv_trad.sr_yahoo) → #num(DC.iv_trad.sr_adj).
+
+The two errors in Yahoo's data favour the same book. Gold, which the dollar book depends on more
+(@sec-robust), is overstated, and the Treasury future's carry is removed. The same bias affects any unadjusted
+continuous series: assets with positive carry (bonds, high-yielding currencies held long) look worse than they
+are, and assets that cost money to hold (gold, commodities in contango) look better.
+
 
 == ETF proxy basket
 
@@ -411,7 +452,7 @@ is leverage: about 1.8× on average and up to 3×, which brings margin, liquidit
 not capture. 60/30/10 barely needs leverage (≈1.1×), so its absolute-return advantage disappears once risk is
 equalised.
 
-== How robust is the ranking?
+== How robust is the ranking? <sec-robust>
 
 #mtable(T.subperiods, [Sharpe ratio (max drawdown in brackets) by sub-period, unlevered futures books.])
 
