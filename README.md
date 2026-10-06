@@ -169,8 +169,10 @@ leaves all weights and returns before it unchanged). Prices are cached in `data/
 
 ---
 
-Started as a practical question: how to run a long-only multi-asset portfolio and scale it to a target volatility
-with a futures overlay, and which parts of the usual backtest story hold up. By Liangxi Wang, computational
-scientist (Genomics PhD); independent, not affiliated with any employer. Implemented with AI-assisted coding (Claude
-Code); research questions, design decisions, robustness checks and interpretation are my own. Research code, **not
-investment advice**. MIT licence.
+**Motivation:** how to run a long-only multi-asset portfolio, scale it to a target volatility with a futures
+overlay, and find out which parts of the usual backtest story hold up.
+
+- **Author:** Liangxi Wang, computational scientist (Genomics PhD); independent, not affiliated with any employer
+- **AI use:** implemented with AI-assisted coding (Claude Code); the research questions, design decisions,
+  robustness checks and interpretation are my own
+- **Licence:** MIT. Research code, **not investment advice**
