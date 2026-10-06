@@ -27,18 +27,24 @@ from .config import (
     RES_DIR,
     ROLL_CORR_WINDOW,
     ROLL_SHARPE_WINDOW,
+    SPLICE_END,
     STRESS_PERIODS,
     SUBPERIODS,
     TRADING_DAYS,
     VOL_TARGET,
     WORLD_US_WEIGHT,
 )
-from .data import basket_returns, load_prices, tbill_log_returns
+from .data import basket_returns, load_prices, tbill_log_returns, with_backadjusted_futures
 from .metrics import common, period_return, rolling_sharpe, series_metrics, span
 from .stats import bootstrap_sharpe_diff
 from .tables import METRIC_ROWS, SHORT_ROWS, fmt, metrics_table, write_results
 
 LAB = PORT_LABELS
+
+
+def weekly(log_returns: pd.DataFrame | pd.Series):
+    """Weekly log returns (Friday weeks), for correlations between series that close at different times."""
+    return log_returns.resample("W-FRI").sum(min_count=1).dropna(how="all")
 
 
 @dataclass
@@ -57,6 +63,7 @@ class Study:
         self.fut_lr = self.lr4.loc[self.fut_iv.index]
 
     def run(self) -> None:
+        self.data_check()
         self.futures()
         self.correlations()
         self.etf_replication()
@@ -65,6 +72,43 @@ class Study:
         self.rebalancing()
         self.ucits_sleeves()
         self.world_equities()
+
+    # ------------------------------------------------------------ data: unadjusted vs back-adjusted futures
+
+    def data_check(self) -> None:
+        """Bias of Yahoo's unadjusted front-month series: per leg and on the two inverse-vol books.
+
+        Compared on the common window of the back-adjusted data (no ETF splice), October 2001 to SPLICE_END.
+        """
+        px = self.px
+        legs = ["ES", "DX", "GC", "ZN"]
+        raw = basket_returns(px, [f"{c}_yahoo" for c in legs]).set_axis(legs, axis=1)
+        adj = self.fut4[legs]
+        idx = raw.index.intersection(adj.index)
+        idx = idx[(idx >= self.fut_iv.index[0]) & (idx <= pd.Timestamp(SPLICE_END))]
+        raw, adj = raw.loc[idx], adj.loc[idx]
+        rows, out = [], {}
+        for c in legs:
+            m_raw, m_adj = series_metrics(np.log1p(raw[c])), series_metrics(np.log1p(adj[c]))
+            out[c] = {"ret_yahoo": m_raw["avg_annual_return"], "ret_adj": m_adj["avg_annual_return"],
+                      "sr_yahoo": m_raw["sharpe"], "sr_adj": m_adj["sharpe"]}
+            rows.append([c, fmt(m_raw["avg_annual_return"], "pct"), fmt(m_adj["avg_annual_return"], "pct"),
+                         fmt(m_raw["avg_annual_vol"], "pct"), fmt(m_adj["avg_annual_vol"], "pct"),
+                         fmt(m_raw["sharpe"], "num"), fmt(m_adj["sharpe"], "num")])
+        books_raw = run_three(raw[FUT_USD], raw[FUT_TRAD])
+        books_adj = run_three(adj[FUT_USD], adj[FUT_TRAD])
+        for k in ("iv_usd", "iv_trad", "fixed_trad"):
+            a, b = series_metrics(books_raw[k].ret), series_metrics(books_adj[k].ret)
+            out[k] = {"sr_yahoo": a["sharpe"], "sr_adj": b["sharpe"]}
+            rows.append([LAB[k], fmt(a["avg_annual_return"], "pct"), fmt(b["avg_annual_return"], "pct"),
+                         fmt(a["avg_annual_vol"], "pct"), fmt(b["avg_annual_vol"], "pct"),
+                         fmt(a["sharpe"], "num"), fmt(b["sharpe"], "num")])
+        self.facts["data_check"] = out | {"period": span(raw)}
+        self.tables["data_check"] = {
+            "header": ["Series", "Return, Yahoo", "Return, adjusted", "Vol, Yahoo", "Vol, adjusted",
+                       "Sharpe, Yahoo", "Sharpe, adjusted"],
+            "rows": rows,
+        }
 
     # ------------------------------------------------------------ core futures book
 
@@ -85,7 +129,8 @@ class Study:
         plots.yearly(self.fut_iv, "fig07_fut_yearly_returns.png")
 
     def correlations(self) -> None:
-        lr4, start = self.lr4, self.fut_iv.index[0]
+        # Weekly returns: the futures settle at different times of day, which dilutes daily correlations
+        lr4, start = weekly(self.lr4), self.fut_iv.index[0]
         panels = {
             "a": ("Inv-vol USD basket (ES / DX / GC)", [("ES", "DX"), ("ES", "GC"), ("DX", "GC")]),
             "b": ("Traditional basket (ES / ZN / GC)", [("ES", "ZN"), ("ES", "GC"), ("ZN", "GC")]),
@@ -118,9 +163,9 @@ class Study:
         self.etf, self.etf4 = etf, etf4
         f["etf_period"] = span(etf_iv)
         f["etf_mean_w"] = {k: etf[k].targets.mean().round(2).to_dict() for k in ("iv_usd", "iv_trad")}
-        daily = np.log1p(px[["ES", "SPY", "DX", "UUP", "GC", "GLD", "ZN", "IEF"]].dropna().pct_change()).dropna()
+        wk = weekly(np.log1p(px[["ES", "SPY", "DX", "UUP", "GC", "GLD", "ZN", "IEF"]].dropna().pct_change()).dropna())
         f["fut_etf_corr"] = {
-            f"{a}–{b}": round(float(daily[a].corr(daily[b])), 2)
+            f"{a}–{b}": round(float(wk[a].corr(wk[b])), 2)
             for a, b in [("ES", "SPY"), ("DX", "UUP"), ("GC", "GLD"), ("ZN", "IEF")]
         }
 
@@ -135,8 +180,9 @@ class Study:
 
         ov = common({"futures": self.fut_iv, "etf": etf_iv})
         f["overlap_period"] = span(ov["futures"])
-        f["overlap_corr"] = round(float(ov["futures"].corr(ov["etf"])), 3)
-        f["overlap_te"] = float((ov["futures"] - ov["etf"]).std() * np.sqrt(TRADING_DAYS))
+        ovw = weekly(pd.DataFrame(ov))
+        f["overlap_corr"] = round(float(ovw["futures"].corr(ovw["etf"])), 3)
+        f["overlap_te"] = float((ovw["futures"] - ovw["etf"]).std() * np.sqrt(52))
         plots.compare_fut_etf(ov["futures"], ov["etf"], "fig13_compare_fut_etf.png")
 
         rf = self.rf
@@ -369,7 +415,7 @@ def main() -> None:
     parser.add_argument("--refresh", action="store_true", help="re-download prices from Yahoo Finance")
     args = parser.parse_args()
 
-    study = Study(load_prices(refresh=args.refresh))
+    study = Study(with_backadjusted_futures(load_prices(refresh=args.refresh)))
     study.run()
     preamble = (f"Data through {study.facts['end_date']}; rebalancing every {MAIN_FREQ} months, "
                 f"{COST_BPS:g} bp per unit traded. Futures Sharpe uses rf = 0 (excess returns); "

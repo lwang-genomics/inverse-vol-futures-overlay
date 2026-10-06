@@ -5,19 +5,20 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
 A walk-forward study of long-only **inverse-volatility** portfolios of equities, the US dollar or Treasuries, and
-gold (futures and ETFs, 2001–2026), scaled to a **10% volatility target** with a futures overlay. The focus is on
-which conclusions survive robustness testing.
+gold (back-adjusted futures and ETFs, 2001–2026), scaled to a **10% volatility target** with a futures overlay. The
+focus is on which conclusions survive robustness testing, including the choice of data.
 
 📄 **Full report (PDF):** [`report/inverse_vol_futures_overlay.pdf`](report/inverse_vol_futures_overlay.pdf)
 
 | Claim | Robust? | Evidence |
 |---|---|---|
-| Inverse-vol books cut drawdowns | **Yes** | −11% (dollar book) and −19% (Treasury book) vs −34% for 60/30/10 and −57% for equities; less loss in every stress episode. |
-| The dollar book has the best risk-adjusted return | **Suggestive** | Highest Sharpe (0.87 vs 0.67 / 0.60), but every bootstrap 95% interval of the differences includes zero. |
-| At equal risk the dollar book compounds fastest | Yes, *with ≈2× leverage* | At 10% volatility: 9.8% a year vs 6.9% (Treasury book), 6.0% (60/30/10), 5.0% (equities). |
-| The edge depends on gold | **Yes** | Without gold, both inverse-vol books have a Sharpe ratio of ≈0.35. |
+| Inverse-vol books cut drawdowns | **Yes** | −13% (dollar book) and −17% (Treasury book) vs −34% for 60/30/10 and −58% for equities; less loss in every stress episode. |
+| One defensive asset is better | **No** | Treasuries over 2001–2026 (Sharpe 0.75 vs 0.68), the dollar since 2022 (1.09 vs 0.27); every bootstrap 95% interval includes zero. |
+| At equal risk, inverse-vol beats 60/30/10 | Yes, *with ≈1.8× leverage* | At 10% volatility: 7.9% a year (Treasury book), 7.5% (dollar book), 6.1% (60/30/10), 4.7% (equities). |
+| The dollar book depends on gold | **Yes** | Without gold its Sharpe falls to 0.32; the Treasury book keeps 0.60. |
+| Unadjusted futures would mislead | **Yes** | On Yahoo's front-month futures the dollar book looked best (0.87 vs 0.63): roll gaps overstate gold and erase the Treasury future's carry. |
 | Rebalancing frequency matters | **No** | Monthly to annual moves Sharpe by at most ≈0.06. |
-| S&P 500 beats a world-equity sleeve | **Only in 2012–2026** | On 2000–2026 the two give the same Sharpe inside the book (0.87 vs 0.86). |
+| S&P 500 beats a world-equity sleeve | **Only in 2012–2026** | On 2000–2026 the two give about the same Sharpe inside the dollar book (0.68 vs 0.66). |
 
 ---
 
@@ -36,10 +37,10 @@ which conclusions survive robustness testing.
 
 | At 10% volatility (2001–2026) | Inv-vol USD | Inv-vol Treasury | Fixed 60/30/10 | ES only |
 |---|---:|---:|---:|---:|
-| Annual return | **9.8%** | 6.9% | 6.0% | 5.0% |
-| Max drawdown | **−22.8%** | −30.1% | −27.0% | −28.4% |
-| Sharpe | **0.87** | 0.63 | 0.52 | 0.43 |
-| Average leverage | 1.96× | 1.84× | 1.09× | 0.67× |
+| Annual return | 7.5% | **7.9%** | 6.1% | 4.7% |
+| Max drawdown | **−19.5%** | −28.2% | −29.7% | −30.7% |
+| Sharpe | 0.69 | **0.72** | 0.54 | 0.42 |
+| Average leverage | 1.83× | 1.86× | 1.12× | 0.69× |
 
 ## Why it works, and when it doesn't
 
@@ -58,7 +59,7 @@ which conclusions survive robustness testing.
 </tr>
 <tr>
 <td><sub>Rolling 3-year Sharpe: the lead changes hands; Treasuries led in 2001–2012, the dollar since 2022.</sub></td>
-<td><sub>The ETF version (SPY / UUP / GLD) tracks the futures book closely (correlation 0.91).</sub></td>
+<td><sub>The ETF version (SPY / UUP / GLD) tracks the futures book closely (weekly correlation 0.90).</sub></td>
 </tr>
 </table>
 
@@ -93,14 +94,19 @@ uv run pytest            # unit tests on synthetic data (no network)
 <details>
 <summary><b>Method</b></summary>
 
-- **Universe.** Yahoo Finance continuous futures (ES, DX index, GC, ZN), cross-checked against US ETFs (SPY, UUP,
-  GLD, IEF) and UCITS equity ETFs (CSPX, VWRD/VWCE). A 2000–2026 world-equity proxy (50% SPY + 50% VGTSX) is validated
+- **Futures data.** Back-adjusted daily futures (ES, DX, GC, ZN) from the open-source
+  [pysystemtrade](https://github.com/pst-group/pysystemtrade) project, pinned to one commit, so roll gaps are not
+  counted as returns and carry is included. These free data end in March 2024; each leg then continues with the
+  excess return over T-bills of a total-return ETF (SPY, UUP, GLD, IEF), which tracks it with weekly correlation
+  0.89–0.98. Yahoo's unadjusted front-month series are kept only to measure their bias.
+- **Universe.** Cross-checked against US ETFs (SPY, UUP, GLD, IEF) and UCITS equity ETFs (CSPX, VWRD/VWCE). A 2000–2026 world-equity proxy (50% SPY + 50% VGTSX) is validated
   against ACWI (weekly correlation 0.996).
 - **Walk-forward.** Quarter-end rebalancing to inverse-vol weights from the trailing 252 days; weights drift between
   rebalances; each trade pays 10 bp per unit traded.
 - **Volatility targeting.** At each rebalance the weights are scaled so that the ex-ante volatility from the trailing
   covariance is 10%, with leverage capped at 3×. No full-sample information is used.
 - **Statistics.** Futures Sharpe ratios use rf = 0 (excess returns); ETF and UCITS ones are over 13-week T-bills.
+  Correlations use weekly returns, because the futures settle at different times of day.
   Robustness: sub-periods, moving-block bootstrap of Sharpe differences, stress episodes, drop-one-asset tests and
   rebalance-frequency sensitivity.
 
@@ -111,14 +117,22 @@ uv run pytest            # unit tests on synthetic data (no network)
 
 | Sharpe difference (moving-block bootstrap) | Δ Sharpe | 95% interval | Share > 0 |
 |---|---:|:---:|---:|
-| Inv-vol USD vs Inv-vol Treasury | 0.20 | −0.23 to 0.57 | 80% |
-| Inv-vol USD vs Fixed 60/30/10 | 0.28 | −0.07 to 0.63 | 94% |
+| Inv-vol USD vs Inv-vol Treasury | −0.07 | −0.48 to 0.28 | 30% |
+| Inv-vol USD vs Fixed 60/30/10 | 0.07 | −0.29 to 0.40 | 64% |
+| Inv-vol Treasury vs Fixed 60/30/10 | 0.13 | −0.17 to 0.49 | 82% |
 
 | Sharpe by sub-period | Inv-vol USD | Inv-vol Treasury | Fixed 60/30/10 |
 |---|---:|---:|---:|
-| 2001–2012 | 0.57 | **0.83** | 0.37 |
-| 2013–2021 | **0.95** | 0.56 | 0.93 |
-| 2022–2026 | **1.52** | 0.53 | 0.65 |
+| 2001–2012 | 0.35 | **1.04** | 0.43 |
+| 2013–2021 | 0.89 | 0.74 | **1.07** |
+| 2022–2026 | **1.09** | 0.27 | 0.43 |
+
+| Yahoo front-month vs back-adjusted, 2001–2024 | Sharpe, Yahoo | Sharpe, adjusted |
+|---|---:|---:|
+| Gold (GC) | 0.54 | 0.41 |
+| 10-year Treasury (ZN) | 0.01 | 0.37 |
+| Inv-vol USD | **0.87** | 0.69 |
+| Inv-vol Treasury | 0.63 | **0.75** |
 
 </details>
 
@@ -146,8 +160,8 @@ leaves all weights and returns before it unchanged). Prices are cached in `data/
 <details>
 <summary><b>Limitations</b></summary>
 
-- Yahoo continuous futures are not back-adjusted and roll costs are not modelled (the follow-up above rebuilds the
-  Treasury book on back-adjusted futures). DX is the spot index, with no carry.
+- Back-adjusted futures end in March 2024; after that each leg uses ETF excess returns (fees make this slightly
+  conservative, most for UUP). Roll transaction costs are not modelled.
 - Leverage up to 3× is assumed frictionless: margin, financing and liquidity are ignored.
 - The sample covers only the final leg of the 2000–02 dot-com crash. No taxes; results are in USD.
 

@@ -12,7 +12,7 @@ REPORT_DIR = ROOT / "report"
 
 # label -> Yahoo Finance symbol
 TICKERS = {
-    # Futures (Yahoo continuous front month; not back-adjusted)
+    # Futures: Yahoo continuous front month (not back-adjusted); used only for the roll-bias check
     "ES": "ES=F",  # E-mini S&P 500
     "DX": "DX-Y.NYB",  # ICE US Dollar Index (DX=F has no Yahoo history)
     "GC": "GC=F",  # COMEX gold
@@ -33,6 +33,20 @@ TICKERS = {
     "TBILL": "^IRX",  # 13-week T-bill yield, % p.a.
 }
 START = "2000-01-01"
+
+# Futures returns: back-adjusted (Panama) daily futures from the open-source pysystemtrade project, pinned to one
+# commit, so that each roll's price gap is not counted as a return and carry is included. Its free data end on
+# SPLICE_END; afterwards each leg continues with the excess return over T-bills of a total-return ETF on the same
+# asset. The Yahoo front-month series (TICKERS) are kept only to measure the bias of unadjusted rolls.
+FUTURES_COMMIT = "4420802541a561b8de1b95ef3b43ccc708b2e987"
+FUTURES_URL = "https://raw.githubusercontent.com/pst-group/pysystemtrade/{}/data/futures/{}"
+SPLICE_END = "2024-03-28"
+BACKADJ = {  # study label -> (pysystemtrade instrument, ETF used after SPLICE_END)
+    "ES": ("SP500", "SPY"),
+    "DX": ("DX", "UUP"),
+    "GC": ("GOLD", "GLD"),
+    "ZN": ("US10", "IEF"),
+}
 END = date.today().isoformat()  # yfinance `end` is exclusive -> last complete session
 
 # Backtest
@@ -49,7 +63,7 @@ MAX_LEVERAGE = 3.0
 # Statistics and display
 BOOT_BLOCK = 63  # moving-block bootstrap: ~3-month blocks
 BOOT_N = 2000
-ROLL_CORR_WINDOW = 252
+ROLL_CORR_WINDOW = 52  # weeks: correlations use weekly returns (futures settle at different times of day)
 ROLL_SHARPE_WINDOW = 3 * 252
 DISPLAY_LOG_TARGET = math.log(1.10)  # path-shape plots: 10% avg annual endpoint
 WORLD_US_WEIGHT = 0.50  # world proxy = 50% SPY + 50% VGTSX (calibrated to ACWI, 2008+)

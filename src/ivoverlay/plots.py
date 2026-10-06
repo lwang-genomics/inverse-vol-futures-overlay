@@ -255,7 +255,7 @@ def corr_regimes(regime: pd.DataFrame, name: str) -> None:
     ax.tick_params(length=0)
     for s in ax.spines.values():
         s.set_visible(False)
-    fig.colorbar(im, ax=ax, label="Daily correlation", shrink=0.8)
+    fig.colorbar(im, ax=ax, label="Weekly correlation", shrink=0.8)
     finish(fig, name)
 
 

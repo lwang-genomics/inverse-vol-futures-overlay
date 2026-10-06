@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from ivoverlay.backtest import backtest, inverse_vol_weights, rebalance_dates
+from ivoverlay.data import splice_levels
 
 
 def test_inverse_vol_weights_sum_to_one_and_scale_with_inverse_vol(returns):
@@ -88,3 +89,14 @@ def test_vol_target_hits_target_ex_ante_and_respects_leverage_cap(returns):
 def test_raises_without_enough_history(returns):
     with pytest.raises(ValueError):
         backtest(returns.iloc[:100])
+
+
+def test_splice_continues_futures_with_etf_excess_returns():
+    """Futures returns up to the splice date, ETF excess returns after, with no jump at the join."""
+    idx = pd.bdate_range("2024-03-20", periods=12)
+    fut = pd.Series(0.01, index=idx)  # +1% a day on the futures
+    etf_excess = pd.Series(-0.02, index=idx)  # −2% a day on the ETF, in excess of cash
+    level = splice_levels(fut, etf_excess, idx, "2024-03-28")
+    r = level.pct_change().dropna()
+    assert np.allclose(r.loc[:"2024-03-28"], 0.01)
+    assert np.allclose(r.loc["2024-03-29":], -0.02)

@@ -52,19 +52,21 @@
 #align(center)[
   #text(size: 20pt)[Inverse-Volatility Walk-Forward Backtest] \
   #v(0.5em)
-  #text(size: 10pt, fill: luma(110))[Liangxi Wang · data via Yahoo Finance through #F.end_date · October 2026 \
+  #text(size: 10pt, fill: luma(110))[Liangxi Wang · data through #F.end_date · October 2026 \
     #link("https://github.com/lwang-genomics/inverse-vol-futures-overlay")[github.com/lwang-genomics/inverse-vol-futures-overlay]]
 ]
 #v(0.8em)
 #block(inset: (x: 1.2em), [
   #text(weight: "bold")[Abstract.] A walk-forward study of long-only inverse-volatility portfolios built from
-  futures (S&P 500, the US dollar or 10-year Treasuries, and gold) and from their ETF proxies, October 2001 to
-  October 2026. Weights come from the trailing year and are reset quarterly, trades pay 10 bp, and a futures
-  overlay can scale each book to 10% ex-ante volatility. The inverse-vol books lost less than a fixed 60/30/10
-  portfolio and than equities in every stress episode, and the dollar book had the highest Sharpe ratio (0.87).
-  No Sharpe difference is statistically significant, however, and much of the dollar book's lead comes from
-  2022–2026. The ETF version tracks the futures book closely, rebalancing frequency is a second-order choice, and
-  the S&P 500 sleeve's lead over an All-World sleeve belongs to the period after 2012.
+  back-adjusted futures (S&P 500, the US dollar or 10-year Treasuries, and gold) and from their ETF proxies,
+  October 2001 to October 2026. Weights come from the trailing year and are reset quarterly, trades pay 10 bp, and
+  a futures overlay can scale each book to 10% ex-ante volatility. The robust finding is the drawdown profile: the
+  inverse-vol books lost less than a fixed 60/30/10 portfolio and than equities in every stress episode. Which
+  defensive asset is better depends on the period: Treasuries over the full sample (Sharpe 0.75 vs 0.68 for the
+  dollar book), the dollar since 2022, and no difference is statistically significant. Using unadjusted
+  front-month futures, as is common with free data, would have reversed this ranking. The ETF version tracks the
+  futures book closely, rebalancing frequency is a second-order choice, and the S&P 500 sleeve's lead over an
+  All-World sleeve belongs to the period after 2012.
 ])
 #v(0.2em)
 #figure(image("../figures/" + figset + "fig14_trad_growth.png", width: 84%),
@@ -83,45 +85,64 @@ basket holding 10-year Treasuries instead of the dollar (ES / ZN / GC), run with
 60/30/10 allocation; how do the correlations behind each basket evolve; and, for a European investor, which
 UCITS equity sleeve works better, an S&P 500 ETF (CSPX) or the FTSE All-World ETF (VWRD, the same fund as VWCE)?
 
-- *Performance.* The inverse-vol USD book returns ≈5.0% a year at 5.7% volatility, with a −11% worst drawdown
-  (Sharpe 0.87). Inverse-vol on ES / ZN / GC has a Sharpe of 0.67 and a −19% drawdown. The fixed 60/30/10
-  portfolio earns more in absolute terms at about twice the volatility (Sharpe 0.60, drawdown −34%). Scaled to the
-  same 10% volatility, the USD book compounds fastest (9.8% vs 6.0–6.9% a year), with about 2× leverage.
-- *Read the ranking with caution.* Every block-bootstrap 95% interval for the Sharpe differences includes zero.
-  Inverse-vol on Treasuries was ahead in 2001–2012, much of the dollar book's lead comes from 2022–2026, when bonds
-  fell with equities, and without gold both inverse-vol books have Sharpe ratios near 0.35.
-- *The robust finding is the drawdown profile:* both inverse-vol books lost less than 60/30/10 and equities in
-  every stress episode in the sample.
-- *Implementation.* The ETF version tracks the futures book closely (correlation ≈0.91; Sharpe 0.84 over
-  T-bills). Quarterly rebalancing cuts turnover by a third relative to monthly, and Sharpe moves by less than 0.05.
+- *The robust finding is the drawdown profile.* Both inverse-vol books lost less than 60/30/10 and equities in
+  every stress episode. Their worst drawdowns were −13% (dollar book) and −17% (Treasury book), against −34% for
+  60/30/10 and −58% for equities.
+- *Performance.* Inverse-vol on ES / ZN / GC has the best full-sample Sharpe ratio (0.75, 4.6% a year at 6.2%
+  volatility), ahead of the dollar book (0.68) and 60/30/10 (0.62). Scaled to the same 10% volatility, the Treasury
+  and dollar books compound at 7.9% and 7.5% a year (about 1.8× leverage), against 6.1% for 60/30/10.
+- *The ranking depends on the period.* Treasuries led in 2001–2012 (Sharpe 1.04 vs 0.35), the dollar in
+  2022–2026 (1.09 vs 0.27), when bonds fell with equities. Every block-bootstrap 95% interval for the Sharpe
+  differences includes zero.
+- *Data matter.* On Yahoo's unadjusted front-month futures the dollar book looked best (0.87 vs 0.63). Roll gaps
+  overstate gold by about 2% a year and erase most of the Treasury future's return (@sec-datacheck).
+- *Implementation.* The ETF version tracks the futures book closely (weekly correlation 0.90; Sharpe 0.84 over
+  T-bills). Quarterly rebalancing cuts turnover by a third relative to monthly, and Sharpe moves by at most 0.04.
 - *Equity sleeve.* On 2012–2026 the S&P 500 sleeve beat the All-World sleeve on its own and inside every
   portfolio. A 2000–2026 test with a world-equity proxy shows the lead belongs to one era: the world sleeve led in
-  2000–2011, and inside the inverse-vol book the two are indistinguishable over the full period (Sharpe 0.87 vs
-  0.86).
+  2000–2011, and inside the inverse-vol book the two are indistinguishable over the full period (Sharpe 0.68 vs
+  0.66).
 
 // ---------------------------------------------------------------- 2
 = Data and universe
 
 == Futures basket
 
-Daily adjusted closes are downloaded from Yahoo Finance from 2000-01-01; the futures histories begin in
-August–September 2000:
+Futures returns must not count a roll's price gap as a return, and they must include carry. They are built from
+daily *back-adjusted* futures from the open-source pysystemtrade project, pinned to one commit: the change of the
+back-adjusted price over the actual price of the contract held. These free data end on 28 March 2024; from then on
+each leg continues with the excess return over T-bills of a total-return ETF on the same asset (SPY, UUP, GLD,
+IEF). On 2008–2024 those ETF excess returns track the futures with weekly correlations of 0.89–0.98 and annual
+return gaps of 0.4–1.3% (largest for UUP, whose fees make the splice slightly conservative for the dollar book).
+The futures histories start where Yahoo's do (August–September 2000), so the study windows are unchanged.
 
 #text(size: 9pt, table(
   columns: 3, stroke: none, inset: (x: 5pt, y: 3pt),
   table.hline(stroke: 0.8pt),
-  table.header([*Label*], [*Yahoo symbol*], [*Role*]),
+  table.header([*Label*], [*Futures (to March 2024)*], [*ETF excess return (after)*]),
   table.hline(stroke: 0.5pt),
-  [ES], [ES=F], [E-mini S&P 500 continuous futures],
-  [DX], [DX-Y.NYB], [ICE US Dollar Index (spot); DX=F has no Yahoo history],
-  [GC], [GC=F], [COMEX gold continuous futures],
-  [ZN], [ZN=F], [CBOT 10-year T-note continuous futures (traditional basket)],
+  [ES], [E-mini S&P 500], [SPY],
+  [DX], [ICE US Dollar Index futures (carry included)], [UUP],
+  [GC], [COMEX gold], [GLD],
+  [ZN], [CBOT 10-year T-note (traditional basket)], [IEF],
   table.hline(stroke: 0.8pt),
 ))
 
-Within each basket, series are forward-filled and rows with remaining gaps are dropped. Yahoo's
-continuous futures are not back-adjusted, so roll gaps leak into returns; futures returns are also
-_excess_ returns (no collateral yield), which holds for every futures portfolio here alike.
+Within each basket, series are forward-filled and rows with remaining gaps are dropped. Futures returns are
+_excess_ returns (no collateral yield), which holds for every futures portfolio here alike. ETF and other prices
+are daily adjusted closes from Yahoo Finance from 2000-01-01.
+
+== Unadjusted vs back-adjusted futures <sec-datacheck>
+
+Free continuous futures, such as Yahoo's, splice the front contract to the next at each expiry without
+adjustment, so every roll's price gap is counted as a return. @tbl-datacheck compares them with the back-adjusted
+series over #F.data_check.period. Volatilities are the same, but returns are not. Gold futures trade in contango
+at roughly the cash rate, so the unadjusted series behaves like spot gold and overstates the futures' excess
+return by about 2% a year. Treasury futures trade below the next contract, so each quarterly roll shows up as a
+loss that erases most of their return. The dollar index future's interest-rate carry is also missing from a spot
+index. The book ranking reverses as a result.
+
+#mtable(T.data_check, [Yahoo's unadjusted front-month futures vs back-adjusted futures, #F.data_check.period (before the ETF splice). Unlevered books, same rules. Futures returns are excess of cash.], size: 8.5pt) <tbl-datacheck>
 
 == ETF proxy basket
 
@@ -130,7 +151,7 @@ _excess_ returns (no collateral yield), which holds for every futures portfolio 
   table.hline(stroke: 0.8pt),
   table.header([*ETF*], [*Maps to*], [*Notes*]),
   table.hline(stroke: 0.5pt),
-  [SPY], [ES], [S&P 500 ETF; daily corr with ES #F.fut_etf_corr.at("ES–SPY")],
+  [SPY], [ES], [S&P 500 ETF; weekly corr with ES #F.fut_etf_corr.at("ES–SPY")],
   [UUP], [DX], [Dollar bullish ETF; available from 2007; corr #F.fut_etf_corr.at("DX–UUP")],
   [GLD], [GC], [Gold ETF; fees and tracking differ from futures; corr #F.fut_etf_corr.at("GC–GLD")],
   [IEF], [ZN], [iShares 7–10y Treasury ETF; corr #F.fut_etf_corr.at("ZN–IEF")],
@@ -236,8 +257,9 @@ Walk-forward OOS for futures: #F.fut_period (#F.fut_n_rebal quarterly weight upd
 
 #fig("fig01_fut_assets_cum_log.png")[Cumulative log returns of ES, DX, GC and ZN over the walk-forward window.]
 
-Gold leads in raw cumulative log return. Equities are positive but much more volatile. The dollar is
-roughly flat, and the 10-year note future gains steadily until 2020, then gives much of that back in the 2022 rate shock.
+Gold and equities earned similar excess returns (about 8% a year), gold with less volatility. The dollar future
+lost slightly (−0.7% a year), because holding it paid the interest-rate differential for much of the period, and
+the 10-year note future gains steadily until 2020, then gives much of that back in the 2022 rate shock.
 
 == Portfolio path and drawdown
 
@@ -256,22 +278,24 @@ so the two inverse-vol books differ mainly in the defensive half of their capita
 
 == Rolling correlations in both baskets <sec-corr>
 
-#fig("fig05_rolling_corr.png")[252-day rolling pairwise correlations of daily log returns. *a*, assets of the Inv-vol USD basket. *b*, assets of the traditional basket. ES–GC appears in both panels.]
+#fig("fig05_rolling_corr.png")[52-week rolling pairwise correlations of weekly log returns (the futures settle at different times of day, which dilutes daily correlations). *a*, assets of the Inv-vol USD basket. *b*, assets of the traditional basket. ES–GC appears in both panels.]
 
-#fig("fig06_corr_regimes.png")[Daily correlation by regime for every asset pair in the two baskets (blue = diversifying, red = moving together).]
+#fig("fig06_corr_regimes.png")[Weekly correlation by regime for every asset pair in the two baskets (blue = diversifying, red = moving together).]
 
 The two baskets diversify in different ways:
 
-- *Dollar basket.* The defensive pair DX–GC is persistently and strongly negative: about −0.42 on average,
-  and between −0.34 and −0.47 in every regime. Dollar and gold offset each other, which is why the book's
-  volatility (≈5.7%) sits far below that of any sleeve. ES–DX changes sign over time. It was positive in
-  2001–05, a safe-haven negative in 2008–14 and again in 2021–24, and mostly positive in 2015–17.
-- *Traditional basket.* ES–ZN was the classic hedge: −0.3 to −0.6 from 2002 to 2021. In 2022 it flipped
-  positive (+0.07 in the regime, +#F.roll_corr_last.at("ES–ZN") on the latest 1-year window). ZN–GC is
-  _positive_ in every regime and peaks near +0.6 in 2017, 2020 and 2023. Bonds and gold both respond to
-  real yields, so they hedge each other poorly.
-- Today all three traditional pairs are positive (+0.2 to +0.3), so the traditional basket is at a low point of
-  internal diversification, while the dollar basket still has two negative pairs.
+- *Dollar basket.* The defensive pair DX–GC is persistently and strongly negative: about
+  #F.roll_corr_mean.at("DX–GC") on average, and between −0.33 and −0.56 in every regime. Dollar and gold offset
+  each other, which is why the book's volatility (≈6%) sits far below that of any sleeve. ES–DX changed sign: it
+  was slightly positive in 2001–07 and negative (−0.23 to −0.37) in every regime since, the dollar acting as a
+  safe haven.
+- *Traditional basket.* ES–ZN was the classic hedge, between −0.18 and −0.45 in every regime up to 2021. In 2022 it
+  flipped positive (+0.15 in the regime, +#F.roll_corr_last.at("ES–ZN") on the latest 1-year window). ZN–GC is
+  _positive_ in every regime (+0.09 to +0.39): bonds and gold both respond to real yields, so they hedge each
+  other poorly.
+- Today all three traditional pairs are positive (+#F.roll_corr_last.at("ES–ZN") to
+  +#F.roll_corr_last.at("ZN–GC")), so the traditional basket is at a low point of internal diversification, while
+  the dollar basket still has two negative pairs.
 
 == Calendar-year returns
 
@@ -284,10 +308,10 @@ The two baskets diversify in different ways:
 // ---------------------------------------------------------------- 5
 = Insights (futures)
 
-+ *Risk-adjusted performance is the story.* Absolute return (≈5.0% a year) trails ES and GC, but volatility
-  (5.7%) and max drawdown (−11%) are far better, and Sharpe, Sortino and Calmar lead the table.
-+ *Inverse-vol concentrates in DX.* Low dollar volatility mechanically pulls about half of the weight. Results are
-  sensitive to the DX proxy (DX-Y.NYB spot index, not listed DX futures, so no carry).
++ *Risk-adjusted performance is the story.* Absolute return (≈4.1% a year) trails ES and GC, but volatility
+  (6.0%) and max drawdown (−13%) are far better, and Sharpe, Sortino and Calmar lead the table.
++ *Inverse-vol concentrates in DX.* Low dollar volatility mechanically pulls about half of the weight, so the
+  dollar's carry matters: with a spot dollar index (no carry) the book's Sharpe would look higher (@sec-datacheck).
 + *Diversification is real but regime-dependent.* The dollar–gold offset is the stable ingredient; the
   equity–dollar and equity–bond correlations are not (@sec-corr).
 + *Implementation costs are small.* Quarterly rebalancing trades about 24% of the book a year, so costs come
@@ -298,7 +322,7 @@ The two baskets diversify in different ways:
 
 == Mapping and sample
 
-UUP's history shortens the ETF experiment: walk-forward OOS runs #F.etf_period. On overlapping daily
+UUP's history shortens the ETF experiment: walk-forward OOS runs #F.etf_period. On overlapping weekly
 log returns, correlations against the futures sleeves are ES–SPY #F.fut_etf_corr.at("ES–SPY"),
 DX–UUP #F.fut_etf_corr.at("DX–UUP"), GC–GLD #F.fut_etf_corr.at("GC–GLD") and ZN–IEF #F.fut_etf_corr.at("ZN–IEF").
 
@@ -320,7 +344,7 @@ Mean target weights: SPY #F.etf_mean_w.iv_usd.SPY / UUP #F.etf_mean_w.iv_usd.UUP
 
 #fig("fig13_compare_fut_etf.png")[Futures vs ETF Inv-vol USD cumulative log returns on the common window (each scaled to a 10% average annual endpoint).]
 
-Overlap portfolio correlation ≈ #F.overlap_corr, annualized tracking error ≈ #pct(F.overlap_te).
+Overlap portfolio correlation (weekly) ≈ #F.overlap_corr, annualized tracking error ≈ #pct(F.overlap_te).
 
 == Metrics including ETF and overlap
 
@@ -331,12 +355,12 @@ Overlap portfolio correlation ≈ #F.overlap_corr, annualized tracking error ≈
 
 + SPY / UUP / GLD is a practical proxy for the research basket in a US cash brokerage account.
 + The weights rhyme: UUP plays the same low-vol role as DX (≈52% average weight).
-+ Tracking is close but not perfect (≈2.5% annual TE). The gap reflects fees, futures roll vs ETF economics,
-  and the fact that UUP is not pure DX spot.
-+ On a like-for-like excess-return basis, the ETF book is somewhat weaker: Sharpe 0.84 vs 0.99 for the futures book
-  on the same window. Its 6.5% total return includes ≈1.4% a year of T-bill yield, which leaves about 0.7 pp a
-  year less excess return than futures. That gap is roughly in line with the ETFs' expense ratios (UUP and GLD are
-  the expensive sleeves), and is the realistic cost of implementing the strategy with ETFs.
++ Tracking is close but not perfect (≈2.3% annual tracking error on weekly returns). The gap reflects fees,
+  futures financing vs T-bill yields, and the different maturity of IEF and the 10-year note.
++ On a like-for-like excess-return basis the two are about equal: Sharpe 0.84 for the ETF book over T-bills and
+  0.81 for the futures book on the same window. The ETFs' expense ratios (UUP and GLD are the expensive sleeves)
+  are offset by the futures' financing, which costs a little more than T-bills, so ETFs are a fair way to implement
+  the strategy.
 
 // ---------------------------------------------------------------- 8
 = Comparison with a traditional portfolio
@@ -346,10 +370,9 @@ Overlap portfolio correlation ≈ #F.overlap_corr, annualized tracking error ≈
 #fig("fig14_trad_growth.png")[Futures portfolios on their common window (#F.trad_fut_period). *a*, unlevered cumulative log returns. *b*, the same books scaled ex ante to a 10% volatility target at every rebalance (@sec-vt). Grey = ES alone.]
 
 Unlevered (panel a), the fixed 60/30/10 portfolio ends highest of the three diversified books, but it carries
-about twice the risk of the inverse-vol books. Scaled to the same risk (panel b), the order changes. Inv-vol USD
-ends highest, followed by Inv-vol Trad, then 60/30/10, then equities alone. The path matters, though: Inv-vol Trad led
-until about 2014 and stayed level with Inv-vol USD until 2021, and its shortfall is concentrated in the 2022 bond
-sell-off.
+about twice the risk of the inverse-vol books. Scaled to the same risk (panel b), the inverse-vol books end ahead of
+60/30/10 and of equities alone. The path matters: Inv-vol Trad led clearly until 2021, and the dollar book closed
+most of the gap only in the 2022 bond sell-off.
 
 == Drawdowns and calendar years
 
@@ -359,7 +382,7 @@ sell-off.
 
 Counting negative calendar years: Inv-vol USD #F.trad_yearly_neg.at("Inv-vol USD"), Inv-vol Trad
 #F.trad_yearly_neg.at("Inv-vol Trad"), Fixed 60/30/10 #F.trad_yearly_neg.at("Fixed 60/30/10"), ES alone
-#F.trad_yearly_neg.at("ES only"). Inv-vol Trad has many negative years, but they are small, except 2022 (−12%).
+#F.trad_yearly_neg.at("ES only"). Inv-vol Trad's negative years are small, except 2022 (−12%).
 
 == Stress episodes
 
@@ -382,10 +405,11 @@ straightforward because their returns are already excess of cash.
 #mtable(T.voltarget, [Futures books scaled ex ante to 10% volatility, quarterly, 10 bp per unit traded, #F.trad_fut_period. Leverage = sum of notional weights at rebalance.])
 
 Realised volatility comes out at ≈11–11.5%, slightly above target, because exposure is only reset quarterly. At
-equal risk, Inv-vol USD returns 9.8% a year, against 6.9% for Inv-vol Trad, 6.0% for 60/30/10 and 5.0% for
-equities alone. It also has the shallowest drawdown (−23%). The price is leverage: ≈2× on average and up to
-2.9×, which brings margin, liquidity and model risk that a backtest does not capture. 60/30/10 barely needs
-leverage (≈1.1×), so its absolute-return advantage disappears once risk is equalised.
+equal risk, Inv-vol Trad returns 7.9% a year and Inv-vol USD 7.5%, against 6.1% for 60/30/10 and 4.7% for
+equities alone. The dollar book has the shallowest drawdown (−20%, against −28% to −31% for the others). The price
+is leverage: about 1.8× on average and up to 3×, which brings margin, liquidity and model risk that a backtest does
+not capture. 60/30/10 barely needs leverage (≈1.1×), so its absolute-return advantage disappears once risk is
+equalised.
 
 == How robust is the ranking?
 
@@ -393,38 +417,40 @@ leverage (≈1.1×), so its absolute-return advantage disappears once risk is eq
 
 #fig("fig20_rolling_sharpe.png")[Rolling 3-year Sharpe ratio of the three unlevered futures books.]
 
-The ranking is not stable over time. In 2001–2012, Inv-vol Trad had the best Sharpe (0.83 vs 0.57 for
-Inv-vol USD), helped by Treasuries rallying in 2002 and 2008. In 2013–2021, Inv-vol USD and 60/30/10 were
-roughly tied (0.95 vs 0.93). Only in 2022–2026 does Inv-vol USD pull clearly ahead (1.52 vs ≈0.5–0.65).
-Leadership in the rolling 3-year Sharpe changes hands several times.
+The ranking is not stable over time. In 2001–2012, Inv-vol Trad had by far the best Sharpe (1.04 vs 0.35 for
+Inv-vol USD), helped by Treasuries rallying in 2002 and 2008. In 2013–2021, 60/30/10 led (1.07, against 0.89 and
+0.74). In 2022–2026, Inv-vol USD pulled clearly ahead (1.09 vs 0.27–0.43). Leadership in the rolling 3-year
+Sharpe changes hands several times.
 
 #mtable(T.bootstrap, [Moving-block bootstrap (63-day blocks, 2,000 resamples) of full-sample Sharpe differences between the unlevered futures books.])
 
-Sampling noise is large relative to the differences. None of the 95% intervals excludes zero. Inv-vol USD has
-the higher Sharpe in 94% of resamples against 60/30/10 and in 80% against Inv-vol Trad. The data are
-consistent with the dollar book being better, but they do not establish it.
+Sampling noise is large relative to the differences. None of the 95% intervals excludes zero. Inv-vol Trad has
+the higher Sharpe in 82% of resamples against 60/30/10 and in 70% against Inv-vol USD. The data lean towards the
+Treasury book over the full sample, but they do not establish a winner.
 
-The result also leans on gold. Over the sample, gold futures had a Sharpe of
+The dollar book leans on gold. Over the sample, gold futures had a Sharpe of
 #calc.round(F.gc_sharpe, digits: 2) during a long bull market. The same inverse-vol rule without gold has a
-Sharpe of only #calc.round(F.no_gold_sharpe.at("Inv-vol ES/DX"), digits: 2) for ES / DX and
-#calc.round(F.no_gold_sharpe.at("Inv-vol ES/ZN"), digits: 2) for ES / ZN.
+Sharpe of only #calc.round(F.no_gold_sharpe.at("Inv-vol ES/DX"), digits: 2) for ES / DX, but
+#calc.round(F.no_gold_sharpe.at("Inv-vol ES/ZN"), digits: 2) for ES / ZN: Treasuries diversify equities on their
+own, the dollar much less so.
 
 
 == Insights (traditional comparison)
 
 + *Drawdown control is the robust finding.* Both inverse-vol books lost less than 60/30/10 and equities in every
-  stress episode, and their worst drawdowns (−11% and −19%) are a fraction of 60/30/10's −34%. This holds
+  stress episode, and their worst drawdowns (−13% and −17%) are a fraction of 60/30/10's −34%. This holds
   across sub-periods.
-+ *Return per unit of risk favours the dollar book in this sample, but not conclusively.* Its full-sample Sharpe
-  is the highest (0.87 vs 0.67 and 0.60 in futures; 0.84 vs 0.68 and 0.66 for ETFs over T-bills). The
-  bootstrap intervals include zero, and the lead comes mainly from 2022–2026.
-+ *At equal risk the dollar book compounds fastest, but only with ≈2× leverage.* 60/30/10's higher unlevered
-  return reflects higher risk, not a better mix.
++ *Neither defensive asset wins conclusively.* Over the full futures sample the Treasury book has the higher
+  Sharpe (0.75 vs 0.68; 60/30/10 0.62); on the shorter ETF window (2008–2026), which is dominated by 2022–2026, the
+  dollar book does (0.84 vs 0.68 over T-bills). The bootstrap intervals include zero.
++ *At equal risk both inverse-vol books beat 60/30/10, with ≈1.8× leverage.* 60/30/10's higher unlevered return
+  reflects higher risk, not a better mix.
 + *The defensive asset decides which regime you are protected in.* Treasuries hedged the deflationary sell-offs
-  (2002, 2008, 2020); the dollar hedged the 2022 inflation shock (Inv-vol USD +1.4% vs Inv-vol Trad −12.1% for
-  the year). Neither hedge worked in every regime.
-+ *Gold does much of the work in both inverse-vol books.* Without it, their Sharpe ratios fall to ≈0.35. Any
-  forward-looking use of the strategy is partly a bet that gold keeps diversifying the way it did in 2001–2026.
+  (2002, 2008); the dollar hedged the 2022 inflation shock (Inv-vol USD +1.8% vs Inv-vol Trad −12.4% for the
+  year). Neither hedge worked in every regime.
++ *Gold matters most for the dollar book.* Without gold its Sharpe falls to ≈0.32; the Treasury book keeps 0.60.
+  Any forward-looking use of the dollar version is partly a bet that gold keeps diversifying the way it did in
+  2001–2026.
 
 // ---------------------------------------------------------------- 9
 = Rebalancing frequency <sec-rebal>
@@ -434,7 +460,7 @@ Sharpe of only #calc.round(F.no_gold_sharpe.at("Inv-vol ES/DX"), digits: 2) for 
 #mtable(T.rebal, left-cols: 2, [Rebalance-frequency sensitivity, futures, common window #F.rebal_period, 10 bp per unit traded. \*Constant mix = monthly weights from the prior calendar year applied to daily log returns (implicit daily rebalancing, no costs).], size: 8.5pt)
 
 + *Frequency barely matters.* Across monthly to annual schedules, Sharpe moves by at most ≈0.06 and max drawdown
-  by at most ≈2.5 pp for every portfolio. These differences are smaller than the estimation noise of a 25-year
+  by at most ≈3 pp for every portfolio. These differences are smaller than the estimation noise of a 25-year
   backtest.
 + *Costs are negligible at this turnover.* Quarterly rebalancing trades about 15–25% of the book a year, or
   1.5–2.5 bp a year at 10 bp per unit. Even at 50 bp per unit the drag would stay below 0.15 pp a year.
@@ -503,10 +529,10 @@ books as its total return in excess of T-bills, with DX, ZN and GC unchanged (#F
 
 Inside the portfolios the pattern is the same and smaller. The world sleeve gave the higher Sharpe in every
 book in 2001–2011, and the S&P 500 sleeve did so in every book in 2012–2026. Over the full period, Inv-vol USD
-has a Sharpe of 0.87 with the S&P 500 and 0.86 with the world sleeve. The block-bootstrap difference is
+has a Sharpe of 0.68 with the S&P 500 and 0.66 with the world sleeve. The block-bootstrap difference is
 #num(F.world_boot.iv_usd.diff), with a 95% interval of
 [#num(F.world_boot.iv_usd.lo), #num(F.world_boot.iv_usd.hi)]. The
-return cost of the world sleeve in that book was ≈0.2 pp a year (4.94% vs 4.74%).
+return cost of the world sleeve in that book was ≈0.2 pp a year (4.10% vs 3.92%).
 
 == Insights (equity sleeve)
 
@@ -526,26 +552,27 @@ return cost of the world sleeve in that book was ≈0.2 pp a year (4.94% vs 4.74
 // ---------------------------------------------------------------- 11
 = Conclusions
 
-A walk-forward inverse-volatility mix of equities, the US dollar and gold is much smoother than any single
-sleeve. Over 2001–2026 its worst drawdown was −11%, against −34% for a fixed 60/30/10 portfolio and −57% for
-equities. It also came out ahead of a Treasury-based inverse-vol basket and of 60/30/10 on return per unit of
-risk, and it compounded fastest when all books were scaled ex ante to the same 10% volatility.
+A walk-forward inverse-volatility mix of equities, a defensive asset and gold is much smoother than any single
+sleeve. Over 2001–2026 the worst drawdowns were −13% (dollar) and −17% (Treasuries), against −34% for a fixed
+60/30/10 portfolio and −58% for equities. Both inverse-vol books also beat 60/30/10 on return per unit of risk, and
+when all books were scaled ex ante to the same 10% volatility.
 
-That ranking is suggestive rather than established. The Sharpe differences are within bootstrap noise, the
-Treasury version led in 2001–2012, much of the dollar book's edge comes from the 2022 inflation shock, and both
-inverse-vol books depend heavily on gold's long bull market. The safer reading is that inverse-vol weighting
-on these assets reliably cuts drawdowns. Which defensive asset works best depends on whether the next crisis
-is deflationary (Treasuries) or inflationary (the dollar).
+Which defensive asset is better is not settled. Over the full sample the Treasury book has the higher Sharpe; it
+led by a wide margin in 2001–2012, and the dollar book led in 2022–2026. The differences are within bootstrap
+noise, and the dollar book depends heavily on gold's long bull market. The safer reading is that inverse-vol
+weighting on these assets reliably cuts drawdowns, and that the choice of defensive asset is a view on whether
+the next crisis is deflationary (Treasuries) or inflationary (the dollar). The data treatment matters as much
+as that view: on unadjusted front-month futures, the dollar book would have looked best.
 
-The ETF implementation tracks the futures book closely but gives up about 0.7 pp a year of excess return to
-fees and tracking. The rebalancing schedule is a second-order choice; quarterly is a practical default. Among
+The ETF implementation tracks the futures book closely, with about the same excess return. The rebalancing schedule is a second-order choice; quarterly is a practical default. Among
 UCITS equity sleeves, the S&P 500 won the 2012–2026 backtest, but inside the inverse-vol book the difference is
 small. A 2000–2026 test with a world-equity proxy shows that the S&P 500's lead is specific to that era. The
 world sleeve led in 2000–2011, and over the full period the two sleeves give the same Sharpe inside the
 inverse-vol book. Choosing between CSPX and VWCE is therefore a view on continued US leadership, not something
 the backtest settles.
 
-Caveats: Yahoo data limitations (DX via DX-Y.NYB, non-back-adjusted continuous futures, no futures roll costs);
+Caveats: futures are back-adjusted only to March 2024 and continue with ETF excess returns after that; roll
+transaction costs are not modelled;
 futures Sharpe ratios use $r_f = 0$ because their returns are already excess of cash, while ETF and UCITS ratios
 are over 13-week T-bills; the volatility-targeted books assume frictionless leverage up to 3×; the sample covers
 only the final leg of the 2000–02 dot-com crash; the defensive sleeves use US-listed ETFs (a European investor would need UCITS
